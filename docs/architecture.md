@@ -13,7 +13,7 @@ This means deterministic code handles the majority of extraction and comparison 
 ### Pipeline Stages
 
 **Stage 1 — Classification (Gemini)**
-- Batches of ~20 emails sent to Gemini 3.6 Flash
+- Batches of ~20 emails sent to Gemini 3.5 Flash-Lite
 - Input: sender, subject, body text, attachment filenames and count
 - Output: one of BL_COMPARISON, SI_REQUEST, INVOICE_QUERY, GENERAL, SPAM
 - Content-hash disk cache makes repeated runs free

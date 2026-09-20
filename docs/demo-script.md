@@ -18,7 +18,7 @@
 
 ## 0:50–1:20 — Tech Stack
 
-> "Our pipeline is built in Python. Gemini 3.6 Flash handles classification — sorting 520 emails into five categories — and adjudicates close calls in document comparison. The extraction and comparison logic is deterministic Python code: PyMuPDF for PDFs, python-docx and openpyxl for other formats. The web demo runs on Cloud Run with FastAPI, and Firestore persists human review decisions across container restarts."
+> "Our pipeline is built in Python. Gemini 3.5 Flash-Lite handles classification — sorting 520 emails into five categories — and adjudicates close calls in document comparison. The extraction and comparison logic is deterministic Python code: PyMuPDF for PDFs, python-docx and openpyxl for other formats. The web demo runs on Cloud Run with FastAPI, and Firestore persists human review decisions across container restarts."
 
 ---
 

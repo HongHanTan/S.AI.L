@@ -13,7 +13,7 @@ This is repetitive, error-prone, and a single missed discrepancy means costly co
 ```
 520 emails (JSON inbox)
    │
-   ├─ S1  CLASSIFY  ── Gemini 3.6 Flash, batched ~20/call, disk-cached
+   ├─ S1  CLASSIFY  ── Gemini 3.5 Flash-Lite, batched ~20/call, disk-cached
    │        └─→ only BL_COMPARISON continues
    │
    ├─ S2  INGEST    ── code: .txt │ .pdf (PyMuPDF) │ .docx │ .xlsx  → DocText
@@ -44,7 +44,7 @@ This is repetitive, error-prone, and a single missed discrepancy means costly co
 | Component | Technology |
 |---|---|
 | Language | Python 3.14 |
-| AI / Classification | Gemini 3.6 Flash (google-genai) |
+| AI / Classification | Gemini 3.5 Flash-Lite (google-genai) |
 | PDF extraction | PyMuPDF |
 | DOCX parsing | python-docx |
 | XLSX parsing | openpyxl |
@@ -77,7 +77,22 @@ uvicorn web.app:app --port 8000                # the four demo screens
 
 ## Results
 
-See [docs/scores.md](docs/scores.md) for the full scoreboard history.
+Scored against the organisers' held-out reference set via the local `POST /submit`
+endpoint. **The answer key is never read** — only the returned metrics.
+
+| Axis | Weight | Score |
+|---|---:|---:|
+| End-to-end defect catching | 50% | **0.978** (45 of 46 defects caught) |
+| Stage-3 defect F1 | 20% | **0.989** (precision 1.00 — no false alarms) |
+| Stage-1 classification macro-F1 | 30% | **0.958** |
+| **Final score** | | **0.9743** |
+
+Reliability is reported separately: **0.947**, with escalation precision 1.00 —
+the system never asks for help when it does not need it.
+`wrong_doc_type` 5/5, `missing_attachment` 5/5, `unreadable` 5/5, `missing_value` 3/5.
+
+Progression: `0.0124` (baseline) -> `0.7465` (deterministic pipeline) -> `0.9743`
+(with Gemini classification). See [docs/scores.md](docs/scores.md) for every run.
 
 ## What We Found in the Data
 
