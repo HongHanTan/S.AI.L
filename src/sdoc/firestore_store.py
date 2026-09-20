@@ -13,8 +13,11 @@ COLLECTION = "alias_decisions"
 
 
 class FirestoreAliasStore(AliasStore):
-    def __init__(self, project: str | None = None, root: str = ".aliases",
+    def __init__(self, project: str | None = None, root: str | None = None,
                  client=None):
+        # root stays None by default so AliasStore can honour SDOC_ALIAS_DIR;
+        # passing a literal default here would override it on hosts whose
+        # filesystem is read-only.
         super().__init__(root=root)
         self.project = project or os.environ.get("GOOGLE_CLOUD_PROJECT")
         self._client = client

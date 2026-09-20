@@ -10,6 +10,7 @@ link and permanently blocks that pair from being promoted again.
 """
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from sdoc.compare.canon import canon_party
@@ -27,7 +28,13 @@ class AliasStore:
         # so the mirror location has to be overridable. Firestore remains the
         # system of record; this is only the local cache of pending decisions.
         self.root = Path(root or os.environ.get("SDOC_ALIAS_DIR", ".aliases"))
-        self.root.mkdir(parents=True, exist_ok=True)
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            # A read-only deployment must still serve the app. Fall back to a
+            # temp directory rather than failing at import time.
+            self.root = Path(tempfile.gettempdir()) / "sdoc-aliases"
+            self.root.mkdir(parents=True, exist_ok=True)
         self.pending_path = self.root / "pending.jsonl"
         self.blocked_path = self.root / "blocked.json"
 

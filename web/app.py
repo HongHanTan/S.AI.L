@@ -102,7 +102,15 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
 
     @app.get("/", response_class=HTMLResponse)
     def index():
-        return (WEB_DIR / "static" / "index.html").read_text(encoding="utf-8")
+        page = WEB_DIR / "static" / "index.html"
+        if not page.exists():
+            # Say what is wrong rather than returning an opaque 500, which on a
+            # serverless host is otherwise indistinguishable from a crash.
+            raise HTTPException(
+                status_code=500,
+                detail=f"index.html missing from the deployment at {page}",
+            )
+        return page.read_text(encoding="utf-8")
 
     static_dir = WEB_DIR / "static"
     if static_dir.exists():
