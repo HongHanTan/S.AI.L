@@ -555,7 +555,7 @@
   "email_021": {
     "subject": "_RPA_ India HSS SD Billing Process Completed - LE HAVRE V.QI540A",
     "from": "hr@aprilasia.com",
-    "category": "SI_REQUEST",
+    "category": "GENERAL",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
@@ -3990,15 +3990,13 @@
   "email_136": {
     "subject": "RE_ TO CONFIRM DOCS _ 5RAE-22394 _ BUSAN_SOUTH KOREA _ PACIFIC OFFICE (M) SDN BHD _ HLCUSIN210099688",
     "from": "elisa_tukiman@april.com.my",
-    "category": "BL_COMPARISON",
+    "category": "GENERAL",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
     "attachment_count": 0,
     "verdicts": [],
-    "notes": [
-      "no documents attached and none claimed"
-    ]
+    "notes": []
   },
   "email_137": {
     "subject": "SI - HLCUSIN975523149 - DIRECT(HAPAG) - 5RCY-92995 - GDANSK_POLAND - TELEX - AIE - 5-Jan-26",
@@ -9692,15 +9690,13 @@
   "email_381": {
     "subject": "RE_ REQUEST BL DRAFT _ PO 25236_ ASIA SYMBOL FOOD SERVICE BOARD__100MT",
     "from": "hari_mardianto@aprilasia.com",
-    "category": "BL_COMPARISON",
+    "category": "GENERAL",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
     "attachment_count": 0,
     "verdicts": [],
-    "notes": [
-      "no documents attached and none claimed"
-    ]
+    "notes": []
   },
   "email_382": {
     "subject": "URGENT: Your email storage is full - verify account immediately",
@@ -9791,28 +9787,24 @@
   "email_384": {
     "subject": "RE_ TO CONFIRM DOCS _ 5APH-63767 _ CALLAO_PERU _ HABRAS INTERNATIONAL LIMITED _ MEDUUD328507",
     "from": "hari_mardianto@aprilasia.com",
-    "category": "BL_COMPARISON",
+    "category": "GENERAL",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
     "attachment_count": 0,
     "verdicts": [],
-    "notes": [
-      "no documents attached and none claimed"
-    ]
+    "notes": []
   },
   "email_385": {
     "subject": "RE_ REQUEST BL DRAFT _ PO 25052_ ASIA SYMBOL FOOD SERVICE BOARD__22MT",
     "from": "aziztz@safqa.co.ke",
-    "category": "BL_COMPARISON",
+    "category": "GENERAL",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
     "attachment_count": 0,
     "verdicts": [],
-    "notes": [
-      "no documents attached and none claimed"
-    ]
+    "notes": []
   },
   "email_386": {
     "subject": "RE_ LOCAL CHARGES FOB - KARGOSMAR - 5RSG-86707 - TELEX RELEASE CHARGES",
@@ -12139,7 +12131,7 @@
   "email_482": {
     "subject": "RE_ TO CONFIRM DOCS _ 5RSG-48811 _ PYEONGTAEK_SOUTH KOREA _ KTP CO., LTD _ OOLU3701242446",
     "from": "arlene_yamomo@aprilasia.com",
-    "category": "GENERAL",
+    "category": "SI_REQUEST",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
@@ -12247,7 +12239,7 @@
   "email_486": {
     "subject": "REQUEST BL DRAFT _ PO 25302_ UNCOATED WOODFREE PAPER IN REA__345MT",
     "from": "deswita_elvyani@aprilasia.com",
-    "category": "GENERAL",
+    "category": "SI_REQUEST",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
@@ -12388,7 +12380,7 @@
   "email_493": {
     "subject": "RE_ TO CONFIRM DOCS _ 5RCY-58695 _ JEBEL ALI_UAE _ KPP-ANTALIS (SINGAPORE) PTE. LTD. _ MCLSIN4389982",
     "from": "arlene_yamomo@aprilasia.com",
-    "category": "GENERAL",
+    "category": "SI_REQUEST",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],
@@ -12474,7 +12466,7 @@
   "email_495": {
     "subject": "RE_ TO CONFIRM DOCS _ 5RVN-97315 _ GDANSK_POLAND _ AL GURG STATIONERY LLC _ OOLU1187233351",
     "from": "mj@fujitogrp.com",
-    "category": "GENERAL",
+    "category": "SI_REQUEST",
     "status": "OK",
     "review_reason": null,
     "defect_fields": [],

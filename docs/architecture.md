@@ -16,6 +16,9 @@ This means deterministic code handles the majority of extraction and comparison 
 - Batches of ~20 emails sent to Gemini 3.5 Flash-Lite
 - Input: sender, subject, body text, attachment filenames and count
 - Output: one of BL_COMPARISON, SI_REQUEST, INVOICE_QUERY, GENERAL, SPAM
+- **Schema-constrained decoding** — the response schema pins the shape and
+  restricts `category` to the five-value enum, so malformed JSON and invalid
+  categories are structurally impossible rather than caught after the fact
 - Content-hash disk cache makes repeated runs free
 - Only BL_COMPARISON emails proceed to document comparison
 
@@ -64,35 +67,44 @@ This means deterministic code handles the majority of extraction and comparison 
 | **Firestore** | Persists human review decisions across restarts | Implemented with a local-file fallback; inactive without service-account credentials |
 
 The deployment target is deliberately not load-bearing: the same application
-runs unchanged on Vercel or Cloud Run. The web bundle carries FastAPI and the
-four document parsers, so uploaded documents can be compared live, but
-**not** the Gemini client — the deployed demo makes no model calls at all. The
-inbox screens read a precomputed `run.json`, and the Compare tab is
-deterministic by design, so nothing a judge clicks can be slowed or broken by
-an API quota.
+runs unchanged on Vercel or Cloud Run. The web bundle carries FastAPI, the four
+document parsers and the Gemini client, so the **Try an email** tab runs the
+whole pipeline live.
+
+Failure is contained by design. Classification calls Gemini with a single
+attempt and no backoff — a serverless function times out long before a rate
+limit window reopens — and falls back to a clearly labelled heuristic if the
+credential is missing or the call fails. Document comparison never calls a
+model at all. So a quota problem degrades one labelled step rather than
+breaking the demo.
 
 The AI itself is the cloud dependency that matters: Gemini performs
 classification across all 520 emails, which is 30% of the measured score.
 
 ---
 
-## Live document comparison
+## Live single-email processing
 
-The inbox screens serve a precomputed run, but the **Compare** tab runs the real
-pipeline on documents uploaded in the browser: ingest, role detection, gating,
-extraction, the comparison ladder and rollup, identical to the batch path.
+The inbox screens serve a precomputed run. The **Try an email** tab runs the
+real pipeline on a hand-written email: classification, ingestion, role
+detection, gating, extraction, the comparison ladder and rollup. It calls the
+same `pipeline.process_email` the 520-email batch run calls, so the demo
+exercises the production path rather than a reimplementation of it.
 
-Two deliberate properties:
+Three deliberate properties:
 
-- **Roles are detected, not declared.** The user uploads two files in any order;
-  each document's own header decides which is the Shipping Instruction and which
-  is the draft Bill of Lading. Filenames are never trusted, because in this
-  corpus filenames lie.
-- **The path is deterministic — no model call.** Deterministic extraction already
-  resolves 98% of fields, and comparison needs a model only for the narrow L3
-  gray band, which falls back to the band midpoint here. An interactive demo is
-  therefore instant, free, and impossible to break with an API quota or a
-  function timeout.
+- **Roles are detected, not declared.** Attachments are uploaded in any order
+  and never labelled; each document's own header decides which is the Shipping
+  Instruction and which is the draft Bill of Lading. Filenames are never
+  trusted, because in this corpus filenames lie.
+- **Comparison never calls a model.** Deterministic extraction resolves ~98% of
+  fields, and only the narrow L3 gray band would need adjudication, which falls
+  back to the band midpoint here. So the expensive half of the pipeline is
+  instant and cannot be rate-limited.
+- **Classification degrades visibly.** It is the one step that needs Gemini. A
+  single attempt, no backoff, and a clearly labelled heuristic fallback if the
+  credential is missing or the call fails — the response says which classifier
+  produced the answer.
 
 Verified live across every supported format, including a `.xlsx` Shipping
 Instruction against a `.docx` Bill of Lading, and including the
@@ -109,15 +121,15 @@ Measured against the organisers' held-out reference set through the local
 |---|---:|---:|
 | End-to-end defect catching | 50% | **0.978** — 45 of 46 defects caught |
 | Stage-3 defect F1 | 20% | **0.989** — precision 1.00, no false alarms |
-| Stage-1 classification macro-F1 | 30% | **0.958** |
-| **Final score** | | **0.9743** |
+| Stage-1 classification macro-F1 | 30% | **0.955** |
+| **Final score** | | **0.9734** |
 
 Reliability is scored separately at **0.947**, with escalation precision 1.00 —
 the system never asks for help when it does not need it. By reason:
 `wrong_doc_type` 5/5, `missing_attachment` 5/5, `unreadable` 5/5, `missing_value` 3/5.
 
 Progression across runs: `0.0124` (baseline) → `0.7465` (deterministic pipeline,
-no model) → `0.9743` (with Gemini classification). The deterministic core alone
+no model) → `0.9734` (with Gemini classification). The deterministic core alone
 reaches 0.978 on the highest-weighted axis, which is what makes the system
 auditable rather than a black box.
 

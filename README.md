@@ -84,14 +84,14 @@ endpoint. **The answer key is never read** — only the returned metrics.
 |---|---:|---:|
 | End-to-end defect catching | 50% | **0.978** (45 of 46 defects caught) |
 | Stage-3 defect F1 | 20% | **0.989** (precision 1.00 — no false alarms) |
-| Stage-1 classification macro-F1 | 30% | **0.958** |
-| **Final score** | | **0.9743** |
+| Stage-1 classification macro-F1 | 30% | **0.955** |
+| **Final score** | | **0.9734** |
 
 Reliability is reported separately: **0.947**, with escalation precision 1.00 —
 the system never asks for help when it does not need it.
 `wrong_doc_type` 5/5, `missing_attachment` 5/5, `unreadable` 5/5, `missing_value` 3/5.
 
-Progression: `0.0124` (baseline) -> `0.7465` (deterministic pipeline) -> `0.9743`
+Progression: `0.0124` (baseline) -> `0.7465` (deterministic pipeline) -> `0.9734`
 (with Gemini classification). See [docs/scores.md](docs/scores.md) for every run.
 
 ## What We Found in the Data

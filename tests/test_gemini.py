@@ -29,7 +29,7 @@ def test_client_reads_from_cache_without_calling_the_model(tmp_path):
     (tmp_path / f"{key}.json").write_text(json.dumps({"verdict": "SAME"}),
                                           encoding="utf-8")
 
-    def explode(prompt):
+    def explode(prompt, schema=None):
         raise AssertionError("model must not be called when cached")
 
     client._call = explode
@@ -38,16 +38,16 @@ def test_client_reads_from_cache_without_calling_the_model(tmp_path):
 
 def test_client_writes_to_cache_after_a_call(tmp_path):
     client = GeminiClient(cache_dir=str(tmp_path), api_key="unused")
-    client._call = lambda prompt: '{"verdict": "DIFFERENT"}'
+    client._call = lambda prompt, schema=None: '{"verdict": "DIFFERENT"}'
     assert client.generate_json("P", default={}) == {"verdict": "DIFFERENT"}
 
-    client._call = lambda prompt: (_ for _ in ()).throw(AssertionError("cached"))
+    client._call = lambda prompt, schema=None: (_ for _ in ()).throw(AssertionError("cached"))
     assert client.generate_json("P", default={}) == {"verdict": "DIFFERENT"}
 
 
 def test_client_returns_default_when_the_model_fails(tmp_path):
     client = GeminiClient(cache_dir=str(tmp_path), api_key="unused", retries=1)
-    client._call = lambda prompt: (_ for _ in ()).throw(RuntimeError("boom"))
+    client._call = lambda prompt, schema=None: (_ for _ in ()).throw(RuntimeError("boom"))
     assert client.generate_json("P", default={"verdict": "UNCERTAIN"}) == {
         "verdict": "UNCERTAIN"}
 
@@ -66,7 +66,7 @@ def test_a_rate_limited_call_is_retried_not_discarded(tmp_path):
                           retries=3, min_interval=0, backoff_seconds=0)
     attempts = []
 
-    def flaky(prompt):
+    def flaky(prompt, schema=None):
         attempts.append(1)
         if len(attempts) < 3:
             raise RuntimeError("429 RESOURCE_EXHAUSTED quota")
@@ -81,7 +81,7 @@ def test_a_rate_limited_call_is_retried_not_discarded(tmp_path):
 def test_persistent_rate_limiting_returns_the_default(tmp_path):
     client = GeminiClient(cache_dir=str(tmp_path), api_key="unused",
                           retries=2, min_interval=0, backoff_seconds=0)
-    client._call = lambda p: (_ for _ in ()).throw(RuntimeError("429 quota"))
+    client._call = lambda p, schema=None: (_ for _ in ()).throw(RuntimeError("429 quota"))
     assert client.generate_json("P", default={"fallback": True}) == {"fallback": True}
 
 
@@ -98,5 +98,5 @@ def test_client_survives_a_read_only_cache_directory(monkeypatch, tmp_path):
     monkeypatch.setenv("SDOC_CACHE_DIR", "Z:/nonexistent-readonly/cache")
     client = GeminiClient(api_key="unused")
     assert client.cache_dir.exists()
-    client._call = lambda p: '{"ok": true}'
+    client._call = lambda p, schema=None: '{"ok": true}'
     assert client.generate_json("P", default={}) == {"ok": True}

@@ -119,9 +119,9 @@
 
 ## 4:25–4:55 — Results and Impact
 
-> "Final score 0.9743 against the held-out reference set. The system catches 45
+> "Final score 0.9734 against the held-out reference set. The system catches 45
 > of 46 real defects with zero false positives — precision 1.00, so it never
-> raises a false alarm. Classification macro-F1 is 0.958."
+> raises a false alarm. Classification macro-F1 is 0.955."
 
 > "The part we are proudest of: the deterministic core alone scores 0.978 on the
 > end-to-end axis before the model is involved at all. That means the result is
@@ -155,10 +155,10 @@ All verifiable from `docs/scores.md` or the live `/api/stats`:
 
 - 520 emails classified, 199 routed as document comparisons
 - 47 mismatches found, 18 cases escalated for human review
-- Final score **0.9743** — end-to-end 0.978, stage-3 F1 0.989, stage-1 F1 0.958
+- Final score **0.9734** — end-to-end 0.978, stage-3 F1 0.989, stage-1 F1 0.955
 - 45 of 46 defects caught, **precision 1.00**
 - Reliability 0.947: wrong document type 5/5, missing attachment 5/5, unreadable 5/5
-- Score progression 0.0124 → 0.7465 (no model) → 0.9743 (with classification)
+- Score progression 0.0124 → 0.7465 (no model) → 0.9734 (with classification)
 
 ## Do not claim
 

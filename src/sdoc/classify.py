@@ -28,9 +28,34 @@ and reused across categories; the body and the attachments matter more.
 An email that merely mentions a BL is not a comparison request unless it asks
 for the documents to be checked against each other.
 
-Return ONLY a JSON object mapping every email_id to its category, e.g.
-{"email_001": "SPAM", "email_002": "BL_COMPARISON"}
+Return one entry per email, giving its email_id and its category.
 """
+
+# Schema-constrained decoding. The model cannot return a category outside this
+# enum or an entry missing its id, so the caller never has to defend against
+# malformed output — the failure mode is removed rather than handled.
+CLASSIFICATION_SCHEMA = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {
+            "email_id": {"type": "STRING"},
+            "category": {"type": "STRING", "enum": list(CATEGORIES)},
+        },
+        "required": ["email_id", "category"],
+    },
+}
+
+
+def _as_mapping(reply) -> dict[str, str]:
+    """Accept either the schema's list form or a plain id->category object."""
+    if isinstance(reply, list):
+        return {
+            item.get("email_id"): item.get("category")
+            for item in reply
+            if isinstance(item, dict)
+        }
+    return reply if isinstance(reply, dict) else {}
 
 
 def build_prompt(batch: list[dict]) -> str:
@@ -56,9 +81,8 @@ def classify_all(emails: list[dict], client, batch_size: int = 20,
 
     for start in range(0, len(emails), batch_size):
         batch = emails[start:start + batch_size]
-        reply = client.generate_json(build_prompt(batch), default={})
-        if not isinstance(reply, dict):
-            reply = {}
+        reply = _as_mapping(client.generate_json(
+            build_prompt(batch), default={}, schema=CLASSIFICATION_SCHEMA))
         for email in batch:
             eid = email["email_id"]
             category = reply.get(eid, "GENERAL")

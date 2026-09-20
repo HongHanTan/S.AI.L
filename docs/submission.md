@@ -40,7 +40,7 @@ surfacing real defects. When it cannot decide — an unreadable scan, a wrong
 document, a missing value — it escalates to a human with the evidence and the
 reason, rather than guessing.
 
-It scores **0.9743** against the organisers' held-out reference set, catching
+It scores **0.9734** against the organisers' held-out reference set, catching
 **45 of 46 defects with zero false positives**. The guiding principle is that the
 model classifies and assists, but code decides: the deterministic core alone
 reaches 0.978 on the end-to-end axis, which keeps every result explainable field
@@ -80,8 +80,8 @@ comparison cannot be a string match.
    report, a per-field decision trace, a human review queue, and a **Compare**
    tab that runs the same pipeline live on two uploaded documents.
 
-**Results.** Final score 0.9743: end-to-end defect catching 0.978, stage-3
-defect F1 0.989 at precision 1.00, classification macro-F1 0.958. Reliability
+**Results.** Final score 0.9734: end-to-end defect catching 0.978, stage-3
+defect F1 0.989 at precision 1.00, classification macro-F1 0.955. Reliability
 0.947 with escalation precision 1.00 — it never asks for help it does not need.
 
 **What makes it different.** Four things.

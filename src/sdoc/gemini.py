@@ -108,9 +108,20 @@ class GeminiClient:
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def _call(self, prompt: str) -> str:
+    def _call(self, prompt: str, schema: dict | None = None) -> str:
         client = self._ensure_client()
-        response = client.models.generate_content(model=self.model, contents=prompt)
+        config = None
+        if schema is not None:
+            from google.genai import types
+            # Schema-constrained decoding: the model cannot emit a field we did
+            # not ask for, or an enum value outside the allowed set. This
+            # removes a whole class of parse failure rather than catching it.
+            config = types.GenerateContentConfig(
+                responseMimeType="application/json",
+                responseSchema=schema,
+            )
+        response = client.models.generate_content(
+            model=self.model, contents=prompt, config=config)
         return response.text
 
     def _throttle(self) -> None:
@@ -122,7 +133,14 @@ class GeminiClient:
         if elapsed < self.min_interval:
             time.sleep(self.min_interval - elapsed)
 
-    def generate_json(self, prompt: str, *, default):
+    def generate_json(self, prompt: str, *, default, schema: dict | None = None):
+        """Ask for JSON, optionally constrained to `schema`.
+
+        With a schema the model's decoding is restricted to valid output, so
+        malformed JSON and out-of-enum values stop being possible. The
+        tolerant text parser remains as a safety net for callers that pass no
+        schema, and for the rare model that ignores one.
+        """
         path = self.cache_dir / f"{cache_key(prompt, self.model)}.json"
         if path.exists():
             try:
@@ -136,7 +154,7 @@ class GeminiClient:
                 self._throttle()
                 self.calls += 1
                 self._last_call_at = time.monotonic()
-                parsed = parse_json_response(self._call(prompt))
+                parsed = parse_json_response(self._call(prompt, schema))
             except Exception as exc:
                 if is_rate_limited(exc) and attempt < self.retries - 1:
                     # A 429 is not a failed request, only an early one. Wait

@@ -8,8 +8,10 @@ class FakeClient:
     def __init__(self, replies):
         self.replies = list(replies)
         self.prompts = []
+        self.schemas = []
 
-    def generate_json(self, prompt, *, default):
+    def generate_json(self, prompt, *, default, schema=None):
+        self.schemas.append(schema)
         self.prompts.append(prompt)
         return self.replies.pop(0) if self.replies else default
 
@@ -78,3 +80,25 @@ def test_make_classifier_returns_a_lookup_callable():
     classifier = make_classifier({"email_001": "SPAM"})
     assert classifier({"email_id": "email_001"}) == "SPAM"
     assert classifier({"email_id": "email_999"}) == "GENERAL"
+
+
+def test_schema_constrains_the_model_to_valid_categories():
+    """Decoding is restricted to the enum, so an invalid category cannot be
+    returned at all rather than being caught after the fact."""
+    client = FakeClient([[{"email_id": "email_001", "category": "SPAM"}]])
+    got = classify_all(emails(1), client, batch_size=20)
+    assert got == {"email_001": "SPAM"}
+
+    schema = client.schemas[0]
+    assert schema is not None
+    enum = schema["items"]["properties"]["category"]["enum"]
+    assert set(enum) == {"BL_COMPARISON", "SI_REQUEST", "INVOICE_QUERY",
+                         "GENERAL", "SPAM"}
+    assert schema["items"]["required"] == ["email_id", "category"]
+
+
+def test_the_object_reply_shape_is_still_accepted():
+    """A model that ignores the schema and returns id->category still works."""
+    client = FakeClient([{"email_001": "INVOICE_QUERY"}])
+    assert classify_all(emails(1), client, batch_size=20) == {
+        "email_001": "INVOICE_QUERY"}
