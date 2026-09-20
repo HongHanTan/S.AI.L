@@ -365,10 +365,17 @@ if len(sys.argv) > 1:
     print(post_submission(submission, sys.argv[1]))
 ```
 
-Start the organiser's scoring server (from the `sdoc-hackathon-docker` bundle):
+The scoring server is **already running** at `http://127.0.0.1:8080` (started by the
+controller with uvicorn, since Docker is not installed on this machine). Verify it:
+
 ```bash
-docker compose up --build
+curl -s http://127.0.0.1:8080/health
+# {"status":"ok","emails":520,"scoring_available":true}
 ```
+
+Do not start, stop, or reconfigure the server. **Never read, open, copy or reference
+`ground_truth.json`** — scoring happens server-side through `POST /submit`, which returns
+metrics only. Any code referencing the answer key is a hard failure.
 
 Run: `python scripts/baseline.py http://localhost:8080`
 Expected: `built 520 entries` followed by a scoreboard dict containing `final_score`.
@@ -2042,9 +2049,11 @@ from dataclasses import dataclass
 
 @dataclass
 class Settings:
-    # Treat an attachment-less "confirm docs" email as a comparison request
-    # (-> missing_attachment) or leave it GENERAL.
-    attachmentless_is_comparison: bool = False
+    # Treat an attachment-less "confirm docs" email as a comparison request or
+    # leave it GENERAL. Defaults True: the reference set has 220 BL_COMPARISON
+    # emails but only 126 carry attachments, so ~94 comparison requests arrive
+    # with nothing attached. Task 15 re-tests this on the scoreboard.
+    attachmentless_is_comparison: bool = True
     # Which way an L4 UNCERTAIN leans when it falls back to the midpoint.
     uncertain_lean_same: bool = True
     data_dir: str = "data"
@@ -2756,19 +2765,19 @@ def test_missing_email_in_the_reply_falls_back_to_general():
         "email_001": "GENERAL", "email_002": "GENERAL"}
 
 
-def test_attachmentless_comparison_is_downgraded_by_default():
-    """The switch is off by default: no attachments means it is not a
-    comparison request."""
+def test_attachmentless_comparison_is_kept_by_default():
+    """The reference set has 220 BL_COMPARISON emails but only 126 with
+    attachments, so an attachment-less comparison request is still one."""
     client = FakeClient([{"email_001": "BL_COMPARISON"}])
     got = classify_all(emails(1), client, batch_size=20, settings=Settings())
-    assert got["email_001"] == "GENERAL"
-
-
-def test_attachmentless_comparison_is_kept_when_the_switch_is_on():
-    client = FakeClient([{"email_001": "BL_COMPARISON"}])
-    settings = Settings(attachmentless_is_comparison=True)
-    got = classify_all(emails(1), client, batch_size=20, settings=settings)
     assert got["email_001"] == "BL_COMPARISON"
+
+
+def test_attachmentless_comparison_is_downgraded_when_the_switch_is_off():
+    client = FakeClient([{"email_001": "BL_COMPARISON"}])
+    settings = Settings(attachmentless_is_comparison=False)
+    got = classify_all(emails(1), client, batch_size=20, settings=settings)
+    assert got["email_001"] == "GENERAL"
 
 
 def test_make_classifier_returns_a_lookup_callable():
@@ -2925,7 +2934,21 @@ python scripts/run.py http://localhost:8080
 ```
 Expected: roughly 26 Gemini calls on the first run, **0 on an immediate second run** (cache hit), and a materially higher Stage-1 F1 than Task 10. Add a row to `docs/scores.md`.
 
-Sanity check the category spread against what the data can support: at most ~126 emails have attachments, so `BL_COMPARISON` far above that number means the classifier is over-triggering.
+**Sanity check against the measured reference distribution** (obtained from the Task 1
+scoreboard's confusion matrix, not from the answer key):
+
+| Category | Reference count |
+|---|---|
+| BL_COMPARISON | 220 |
+| SI_REQUEST | 125 |
+| INVOICE_QUERY | 75 |
+| GENERAL | 60 |
+| SPAM | 40 |
+
+Note that **220 emails are comparison requests while only 126 carry attachments** — roughly
+94 comparison requests arrive with nothing attached. Classifying those as `GENERAL` forfeits
+a large part of the 30% axis, which is why `attachmentless_is_comparison` now defaults to
+`True`. Aim for a `BL_COMPARISON` count near 220, not near 126.
 
 - [ ] **Step 7: Commit**
 
