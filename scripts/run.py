@@ -7,7 +7,9 @@
 import sys
 
 from sdoc.classify import classify_all, make_classifier
+from sdoc.compare.adjudicate import make_adjudicator
 from sdoc.config import SETTINGS
+from sdoc.extract.llm import make_fallback
 from sdoc.gemini import GeminiClient
 from sdoc.inbox import load_emails
 from sdoc.pipeline import run
@@ -39,7 +41,12 @@ if routed == 0:
     print("!! No email was classified BL_COMPARISON - classification failed.",
           file=sys.stderr)
 
-results = run(SETTINGS, classifier)
+results = run(
+    SETTINGS,
+    classifier,
+    adjudicator=make_adjudicator(client),
+    extract_fallback=make_fallback(client) if SETTINGS.use_llm_fallback else None,
+)
 submission = build_submission(results)
 write_submission(submission)
 write_traces(results)
