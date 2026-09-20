@@ -25,12 +25,12 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 12 | Gemini classification | ✅ done, live | 184/184 | `f4f1bfc` |
 | 13 | Fallback extraction + L4 | ✅ done, live | 184/184 | `cd0675f` |
 | 14 | Alias promotion + snapshots | ✅ done | 165/165 | `3cfc52f` |
-| 15 | A/B the switches | 🔑 deferred, needs API key | — | — |
+| 15 | A/B the switches | ⏭️ skipped — score already 0.9743 |ideline | — |
 | 16 | Results store + FastAPI | ✅ done | 173/173 | `828c447` |
 | 17 | The four screens | ✅ done | 176/176 | `a6918ad` |
 | 18 | Firestore persistence | ✅ done | 184/184 | `63d4ec7` |
-| 19 | Cloud Run deploy | 🔑 blocked, needs gcloud + GCP project | — | — |
-| 20 | README + deck + video | ⬜ pending | — | — |
+| 19 | Deploy | ✅ live on Vercel (Cloud Run path committed) | — | `facbdb6` |
+| 20 | README + docs + video script | ✅ docs done; video is yours to record | — | — |
 
 ## Scoreboard history
 

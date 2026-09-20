@@ -54,14 +54,46 @@ This means deterministic code handles the majority of extraction and comparison 
 - Evidence trace per email for debugging
 - POST to scoring server
 
-### GCP Services
+### Deployment and cloud services
 
-| Service | Role |
-|---|---|
-| **Cloud Run** | Hosts the FastAPI web app, scales to zero |
-| **Gemini API** | Classification, fallback extraction, L4 adjudication |
-| **Firestore** | Persists human review decisions across container restarts |
-| **Artifact Registry** | Cloud Run's container image source |
+| Service | Role | Status |
+|---|---|---|
+| **Gemini API** (`gemini-3.5-flash-lite`) | Classification, fallback extraction, L4 adjudication | **Live** — core functionality |
+| **Vercel** | Hosts the FastAPI demo at [sibl-seven.vercel.app](https://sibl-seven.vercel.app) | **Live** |
+| **Cloud Run + Artifact Registry** | Alternative host; `Dockerfile` and `scripts/deploy.sh` are committed and ready | Ready, not currently deployed |
+| **Firestore** | Persists human review decisions across restarts | Implemented with a local-file fallback; inactive without service-account credentials |
+
+The deployment target is deliberately not load-bearing. The server reads a
+precomputed `run.json` and imports only FastAPI and Pydantic — the parsing and
+model libraries never load in the web process. That keeps the demo instant,
+costs no model calls while it is being browsed, and means the same application
+runs unchanged on Vercel or Cloud Run.
+
+The AI itself is the cloud dependency that matters: Gemini performs
+classification across all 520 emails, which is 30% of the measured score.
+
+---
+
+## Results
+
+Measured against the organisers' held-out reference set through the local
+`POST /submit` endpoint. The answer key is never read — only the returned metrics.
+
+| Axis | Weight | Score |
+|---|---:|---:|
+| End-to-end defect catching | 50% | **0.978** — 45 of 46 defects caught |
+| Stage-3 defect F1 | 20% | **0.989** — precision 1.00, no false alarms |
+| Stage-1 classification macro-F1 | 30% | **0.958** |
+| **Final score** | | **0.9743** |
+
+Reliability is scored separately at **0.947**, with escalation precision 1.00 —
+the system never asks for help when it does not need it. By reason:
+`wrong_doc_type` 5/5, `missing_attachment` 5/5, `unreadable` 5/5, `missing_value` 3/5.
+
+Progression across runs: `0.0124` (baseline) → `0.7465` (deterministic pipeline,
+no model) → `0.9743` (with Gemini classification). The deterministic core alone
+reaches 0.978 on the highest-weighted axis, which is what makes the system
+auditable rather than a black box.
 
 ---
 
