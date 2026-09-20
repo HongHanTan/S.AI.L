@@ -8,6 +8,7 @@ import sys
 
 from sdoc.classify import classify_all, make_classifier
 from sdoc.compare.adjudicate import make_adjudicator
+from sdoc.compare.alias import AliasStore
 from sdoc.config import SETTINGS
 from sdoc.extract.llm import make_fallback
 from sdoc.gemini import GeminiClient
@@ -41,10 +42,29 @@ if routed == 0:
     print("!! No email was classified BL_COMPARISON - classification failed.",
           file=sys.stderr)
 
+store = AliasStore()
+alias_table = store.load(SETTINGS.alias_snapshot)
+base_adjudicator = make_adjudicator(client)
+
+
+def recording_adjudicator(**kwargs):
+    result = base_adjudicator(**kwargs)
+    store.record_pending({
+        "si_value": kwargs["si_value"],
+        "bl_value": kwargs["bl_value"],
+        "verdict": result["verdict"],
+        "source": "l4",
+        "similarity": kwargs.get("similarity", 0.0),
+        "field": kwargs["field_name"],
+    })
+    return result
+
+
 results = run(
     SETTINGS,
     classifier,
-    adjudicator=make_adjudicator(client),
+    adjudicator=recording_adjudicator,
+    alias=alias_table,
     extract_fallback=make_fallback(client) if SETTINGS.use_llm_fallback else None,
 )
 submission = build_submission(results)
