@@ -22,13 +22,13 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 9 | Comparison ladder + rollup | ✅ done | 125/125 | `d259a06` |
 | 10 | Deterministic pipeline, first score | ✅ done | 132/132 +5 integ | `2b563a7` |
 | 11 | Gemini client + cache | ✅ done | 139/139 | `73926e0` |
-| 12 | Gemini classification | 🔑 built, needs API key | 147/147 | `f4f1bfc` |
-| 13 | Fallback extraction + L4 | 🔑 built, needs API key | 156/156 | `cd0675f` |
+| 12 | Gemini classification | ✅ done, live | 184/184 | `f4f1bfc` |
+| 13 | Fallback extraction + L4 | ✅ done, live | 184/184 | `cd0675f` |
 | 14 | Alias promotion + snapshots | ✅ done | 165/165 | `3cfc52f` |
 | 15 | A/B the switches | 🔑 deferred, needs API key | — | — |
 | 16 | Results store + FastAPI | ✅ done | 173/173 | `828c447` |
 | 17 | The four screens | ✅ done | 176/176 | `a6918ad` |
-| 18 | Firestore persistence | ⏳ in progress | — | — |
+| 18 | Firestore persistence | ✅ done | 184/184 | `63d4ec7` |
 | 19 | Cloud Run deploy | 🔑 blocked, needs gcloud + GCP project | — | — |
 | 20 | README + deck + video | ⬜ pending | — | — |
 
@@ -38,6 +38,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 |---|---|---|---|
 | 1 | baseline, everything GENERAL | **0.0124** | proves the submit loop; stage1 macro-F1 0.041 |
 | 2 | deterministic pipeline, heuristic classifier | **0.7465** | end-to-end 45/46 = 0.978; stage3 F1 0.989 (precision 1.00); stage1 still 0.199 |
+| 3 | live Gemini classification, batches lost to rate limits | 0.4136 | 17 of 26 batches hit HTTP 429 and silently fell back to GENERAL |
+| 4 | rate-limit aware + gemini-3.5-flash-lite | **0.9743** | stage1 0.958, stage3 0.989, end-to-end 0.978, reliability 0.947 |
 
 ## Notes and decisions
 
@@ -127,3 +129,13 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   (Cloud Run deploy) cannot run. Install the Google Cloud SDK from
   https://cloud.google.com/sdk/docs/install and have a GCP project ready. The live
   prototype link is a mandatory submission field.
+- **2026-09-20** — **Score 0.9743.** Live classification took stage-1 from 0.199 to 0.958
+  and dragged reliability up with it: `missing_attachment` went 2/5 to **5/5** because the
+  three zero-attachment cases finally reached the gate. wrong_doc_type 5/5, unreadable 5/5.
+- **2026-09-20** — Two model issues found and fixed along the way. `gemini-2.0-flash` is
+  retired (the API names `gemini-3.6-flash` as successor), and `gemini-3.6-flash` exhausted
+  its free-tier allowance at 20 requests, so the pipeline now runs on
+  `gemini-3.5-flash-lite`, which has separate quota and classifies just as well.
+- **2026-09-20** — Rate limiting was the whole story behind the 0.4136 dip: a 429 is an
+  early request, not a failed one. The client now throttles, recognises quota errors, and
+  waits the exact interval the server names.

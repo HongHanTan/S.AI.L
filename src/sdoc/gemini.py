@@ -12,7 +12,7 @@ from pathlib import Path
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
-DEFAULT_MODEL = "gemini-3.6-flash"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 
 # The free tier meters requests per minute. These defaults keep a full
 # classification run inside it; raise the pace on a paid key.
