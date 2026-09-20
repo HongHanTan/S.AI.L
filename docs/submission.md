@@ -84,16 +84,23 @@ comparison cannot be a string match.
 defect F1 0.989 at precision 1.00, classification macro-F1 0.958. Reliability
 0.947 with escalation precision 1.00 — it never asks for help it does not need.
 
-**What makes it different.** Four things. The deployed demo is not a
-screenshot of a result — upload any Shipping Instruction and draft Bill of
-Lading, in either order, and it runs the real pipeline and reports back
-immediately. First, numbers never reach a language
-model; they are parsed and compared exactly, because that is where models invent
-errors. Second, when comparing companies we compare names before addresses —
-the dataset contains two different companies at an identical address, which
-whole-field matching scores as a match and misses. And a reading problem is
-never reported as a discrepancy: an unreadable document escalates to a person
-instead of producing a confident wrong answer.
+**What makes it different.** Four things.
+
+First, **numbers never reach a language model.** They are parsed and compared
+exactly, because arithmetic is where models invent errors.
+
+Second, **company names are compared before addresses.** The dataset contains
+two genuinely different companies at an identical address — whole-field matching
+scores that as a match and misses a real defect.
+
+Third, **a reading problem is never reported as a discrepancy.** An unreadable
+scan or a wrong document escalates to a person with the evidence, instead of
+producing a confident wrong answer.
+
+Fourth, **the deployed demo is not a screenshot of a result.** Upload any
+Shipping Instruction and draft Bill of Lading, in either order, and it runs the
+real pipeline and reports back immediately — no model call, so it cannot be
+slowed or broken by an API quota.
 
 ---
 
@@ -101,7 +108,7 @@ instead of producing a confident wrong answer.
 
 Python 3.14 · Google Gemini (`gemini-3.5-flash-lite`) · FastAPI · PyMuPDF ·
 python-docx · openpyxl · Vercel (live demo) · Cloud Run + Firestore
-(implemented, deployment-ready) · pytest (184 tests)
+(implemented, deployment-ready) · pytest (199 tests)
 
 ---
 
