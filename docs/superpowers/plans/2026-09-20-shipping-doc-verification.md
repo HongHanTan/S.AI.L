@@ -1548,8 +1548,8 @@ def test_disagreeing_summary_and_table_flag_a_conflict():
     """A reading problem, never a discrepancy."""
     doc = DocText(path="a.pdf", fmt="pdf", lines=[
         "CONTAINER NO.", "DESCRIPTION", "GROSS WEIGHT (KG)",
-        "AAA1111111", "40'HC PAPER", "10,000",
-        "BBB2222222", "40'HC PAPER", "10,000",
+        "AAAA1111111", "40'HC PAPER", "10,000",
+        "BBBB2222222", "40'HC PAPER", "10,000",
         "No. of Containers: 5 x 40'HC",
     ])
     got = extract_numeric_fields(doc)

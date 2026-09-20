@@ -17,8 +17,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 4 | Doc-type detection + gates | ✅ done | 35/35 +4 integ | `af91d54` |
 | 5 | Label normalisation | ✅ done | 78/78 | `0b5504d` |
 | 6 | Linear + block extractors | ✅ done | 86/86 | `e80f99e` |
-| 7 | Numeric extraction | ⏳ in progress | — | — |
-| 8 | L1 canon + L3 similarity | ⬜ pending | — | — |
+| 7 | Numeric extraction | ✅ done | 95/95 +5 integ | `58fc327` |
+| 8 | L1 canon + L3 similarity | ⏳ in progress | — | — |
 | 9 | Comparison ladder + rollup | ⬜ pending | — | — |
 | 10 | Deterministic pipeline, first score | ⬜ pending | — | — |
 | 11 | Gemini client + cache | ⬜ pending | — | — |
@@ -87,3 +87,10 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   map extracts the CJK weight label as literal `II`, affecting 8 documents. All fixed.
   Text-field extraction now covers **1189/1210 = 98.3%**, with every remaining gap
   intentional.
+- **2026-09-20** — Task 7 implementer caught a fifth plan defect: my conflict fixture used
+  3-letter container IDs while the regex correctly requires ISO 6346's 4 letters, so the
+  test could never fire. Fixed the fixture rather than weakening the regex.
+- **2026-09-20** — Numeric extraction validated on the real corpus: all-field coverage
+  **98.0%**, and **zero** summary-vs-table conflicts — where a PDF carries both a summary
+  line and a container table, the two independent sources agree every time. All 8 numeric
+  gaps are intentional (501-505 wrong-doc, 516/518/519 missing-value).
