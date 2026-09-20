@@ -16,7 +16,7 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 3 | Ingestion — docx and xlsx | ✅ done | 15/15 +2 integ | `751f4f5` |
 | 4 | Doc-type detection + gates | ✅ done | 35/35 +4 integ | `af91d54` |
 | 5 | Label normalisation | ✅ done | 78/78 | `0b5504d` |
-| 6 | Linear + block extractors | ✅ done | 86/86 | `pending` |
+| 6 | Linear + block extractors | ✅ done | 86/86 | `e80f99e` |
 | 7 | Numeric extraction | ⏳ in progress | — | — |
 | 8 | L1 canon + L3 similarity | ⬜ pending | — | — |
 | 9 | Comparison ladder + rollup | ⬜ pending | — | — |
