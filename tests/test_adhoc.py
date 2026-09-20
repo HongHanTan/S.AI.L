@@ -183,3 +183,28 @@ def test_an_empty_email_is_rejected():
     with pytest.raises(UploadError):
         process_typed_email(subject="   ", body="", files=[],
                             classifier=fixed("GENERAL"))
+
+
+def test_single_email_classifier_reads_the_schema_reply_shape(monkeypatch):
+    """The batch and single-email paths must agree on the reply shape.
+    They diverged once: the single path ignored the schema, received the list
+    form, failed to read it, and silently fell back to the heuristic."""
+    from sdoc.adhoc import _default_classifier
+    from sdoc.config import Settings
+    import sdoc.gemini as gemini_mod
+
+    seen = {}
+
+    class StubClient:
+        api_key = "set"
+
+        def generate_json(self, prompt, *, default, schema=None):
+            seen["schema"] = schema
+            return [{"email_id": "typed_email", "category": "SPAM"}]
+
+    monkeypatch.setattr(gemini_mod, "GeminiClient", lambda **kw: StubClient())
+    classifier, label = _default_classifier(Settings())
+    assert label == "gemini"
+    assert classifier({"email_id": "typed_email", "subject": "x",
+                       "body": "y", "attachments": []}) == "SPAM"
+    assert seen["schema"] is not None

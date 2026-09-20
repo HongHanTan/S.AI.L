@@ -216,7 +216,12 @@ def process_typed_email(
 
 def _default_classifier(settings):
     """Gemini when a key is configured, otherwise an honest fallback."""
-    from sdoc.classify import CATEGORIES, build_prompt
+    from sdoc.classify import (
+        CATEGORIES,
+        CLASSIFICATION_SCHEMA,
+        _as_mapping,
+        build_prompt,
+    )
     from sdoc.gemini import GeminiClient
 
     # Tuned for an interactive request, not a batch run: one attempt, no
@@ -227,8 +232,10 @@ def _default_classifier(settings):
         return _fallback_classifier, "heuristic (no GEMINI_API_KEY configured)"
 
     def classify_one(email: dict) -> str:
-        reply = client.generate_json(build_prompt([email]), default={})
-        category = reply.get(email["email_id"]) if isinstance(reply, dict) else None
+        # Same schema as the batch path, so this reads the same reply shape.
+        reply = _as_mapping(client.generate_json(
+            build_prompt([email]), default={}, schema=CLASSIFICATION_SCHEMA))
+        category = reply.get(email["email_id"])
         if category not in CATEGORIES:
             return _fallback_classifier(email)
         if (category == "BL_COMPARISON"
