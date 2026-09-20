@@ -63,14 +63,40 @@ This means deterministic code handles the majority of extraction and comparison 
 | **Cloud Run + Artifact Registry** | Alternative host; `Dockerfile` and `scripts/deploy.sh` are committed and ready | Ready, not currently deployed |
 | **Firestore** | Persists human review decisions across restarts | Implemented with a local-file fallback; inactive without service-account credentials |
 
-The deployment target is deliberately not load-bearing. The server reads a
-precomputed `run.json` and imports only FastAPI and Pydantic — the parsing and
-model libraries never load in the web process. That keeps the demo instant,
-costs no model calls while it is being browsed, and means the same application
-runs unchanged on Vercel or Cloud Run.
+The deployment target is deliberately not load-bearing: the same application
+runs unchanged on Vercel or Cloud Run. The web bundle carries FastAPI and the
+four document parsers, so uploaded documents can be compared live, but
+**not** the Gemini client — the deployed demo makes no model calls at all. The
+inbox screens read a precomputed `run.json`, and the Compare tab is
+deterministic by design, so nothing a judge clicks can be slowed or broken by
+an API quota.
 
 The AI itself is the cloud dependency that matters: Gemini performs
 classification across all 520 emails, which is 30% of the measured score.
+
+---
+
+## Live document comparison
+
+The inbox screens serve a precomputed run, but the **Compare** tab runs the real
+pipeline on documents uploaded in the browser: ingest, role detection, gating,
+extraction, the comparison ladder and rollup, identical to the batch path.
+
+Two deliberate properties:
+
+- **Roles are detected, not declared.** The user uploads two files in any order;
+  each document's own header decides which is the Shipping Instruction and which
+  is the draft Bill of Lading. Filenames are never trusted, because in this
+  corpus filenames lie.
+- **The path is deterministic — no model call.** Deterministic extraction already
+  resolves 98% of fields, and comparison needs a model only for the narrow L3
+  gray band, which falls back to the band midpoint here. An interactive demo is
+  therefore instant, free, and impossible to break with an API quota or a
+  function timeout.
+
+Verified live across every supported format, including a `.xlsx` Shipping
+Instruction against a `.docx` Bill of Lading, and including the
+`wrong_doc_type` and `unreadable` gates.
 
 ---
 

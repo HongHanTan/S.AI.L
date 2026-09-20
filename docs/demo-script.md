@@ -86,7 +86,23 @@
 
 ---
 
-## 3:30–4:10 — What Made It Hard
+## 3:30–3:55 — Compare live
+
+**Open the Compare tab. Upload a Shipping Instruction and a draft Bill of Lading.**
+
+> "Everything so far was the inbox. This runs the same pipeline live. I upload
+> two documents — in any order, because the system reads each document's own
+> header to work out which is which; the filenames in this dataset actually lie.
+> And the result comes back immediately, because this path never calls a model.
+> Extraction and comparison are deterministic code."
+
+**Point at the Decided-by column.**
+
+> "Every field shows which layer settled it. Nothing here is a black box."
+
+---
+
+## 3:55–4:25 — What Made It Hard
 
 > "Three things in the real data nearly broke this. Every PDF Shipping
 > Instruction is headed 'BILL OF LADING INSTRUCTION' — match on 'Bill of Lading'
@@ -101,7 +117,7 @@
 
 ---
 
-## 4:10–4:45 — Results and Impact
+## 4:25–4:55 — Results and Impact
 
 > "Final score 0.9743 against the held-out reference set. The system catches 45
 > of 46 real defects with zero false positives — precision 1.00, so it never
@@ -121,13 +137,15 @@
 | Intro | 20s |
 | Problem | 30s |
 | Tech stack | 30s |
-| Live demo | 2m 10s |
-| What made it hard | 40s |
-| Results and impact | 35s |
-| **Total** | **4m 45s** |
+| Live demo (inbox, report, evidence, review) | 2m 10s |
+| Compare live — upload two documents | 25s |
+| What made it hard | 30s |
+| Results and impact | 30s |
+| **Total** | **4m 55s** |
 
-Fifteen seconds of headroom. If you run long, cut the second MISMATCH click at
-2:30 — `email_004` alone carries the point.
+Only five seconds of headroom now. If you run long, cut the second MISMATCH
+click at 2:30 — `email_004` alone carries the point — and trim the review queue
+beat to a single sentence.
 
 ---
 

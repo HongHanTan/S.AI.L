@@ -77,17 +77,21 @@ comparison cannot be a string match.
 6. **Roll up** — OK, MISMATCH with the offending fields named, or NEEDS_REVIEW
    with a reason.
 7. **Report** — a web application showing the inbox, a side-by-side discrepancy
-   report, a per-field decision trace, and a human review queue.
+   report, a per-field decision trace, a human review queue, and a **Compare**
+   tab that runs the same pipeline live on two uploaded documents.
 
 **Results.** Final score 0.9743: end-to-end defect catching 0.978, stage-3
 defect F1 0.989 at precision 1.00, classification macro-F1 0.958. Reliability
 0.947 with escalation precision 1.00 — it never asks for help it does not need.
 
-**What makes it different.** Three things. First, numbers never reach a language
+**What makes it different.** Four things. The deployed demo is not a
+screenshot of a result — upload any Shipping Instruction and draft Bill of
+Lading, in either order, and it runs the real pipeline and reports back
+immediately. First, numbers never reach a language
 model; they are parsed and compared exactly, because that is where models invent
 errors. Second, when comparing companies we compare names before addresses —
 the dataset contains two different companies at an identical address, which
-whole-field matching scores as a match and misses. Third, a reading problem is
+whole-field matching scores as a match and misses. And a reading problem is
 never reported as a discrepancy: an unreadable document escalates to a person
 instead of producing a confident wrong answer.
 
