@@ -23,8 +23,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 10 | Deterministic pipeline, first score | ✅ done | 132/132 +5 integ | `2b563a7` |
 | 11 | Gemini client + cache | ✅ done | 139/139 | `73926e0` |
 | 12 | Gemini classification | 🔑 built, needs API key | 147/147 | `f4f1bfc` |
-| 13 | Fallback extraction + L4 | ⏳ in progress | — | — |
-| 14 | Alias promotion + snapshots | ⬜ pending | — | — |
+| 13 | Fallback extraction + L4 | 🔑 built, needs API key | 156/156 | `cd0675f` |
+| 14 | Alias promotion + snapshots | ⏳ in progress | — | — |
 | 15 | A/B the switches | ⬜ pending | — | — |
 | 16 | Results store + FastAPI | ⬜ pending | — | — |
 | 17 | The four screens | ⬜ pending | — | — |
