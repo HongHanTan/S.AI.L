@@ -19,8 +19,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 6 | Linear + block extractors | ✅ done | 86/86 | `e80f99e` |
 | 7 | Numeric extraction | ✅ done | 95/95 +5 integ | `58fc327` |
 | 8 | L1 canon + L3 similarity | ✅ done | 105/105 | `97fca50` |
-| 9 | Comparison ladder + rollup | ⏳ in progress | — | — |
-| 10 | Deterministic pipeline, first score | ⬜ pending | — | — |
+| 9 | Comparison ladder + rollup | ✅ done | 125/125 | `d259a06` |
+| 10 | Deterministic pipeline, first score | ⏳ in progress | — | — |
 | 11 | Gemini client + cache | ⬜ pending | — | — |
 | 12 | Gemini classification | ⬜ pending | — | — |
 | 13 | Fallback extraction + L4 | ⬜ pending | — | — |
