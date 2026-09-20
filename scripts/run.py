@@ -14,6 +14,7 @@ from sdoc.extract.llm import make_fallback
 from sdoc.gemini import GeminiClient
 from sdoc.inbox import load_emails
 from sdoc.pipeline import run
+from sdoc.results import save_run
 from sdoc.submit import build_submission, post_submission, write_submission
 from sdoc.trace import layer_counts, write_traces
 
@@ -67,6 +68,8 @@ results = run(
     alias=alias_table,
     extract_fallback=make_fallback(client) if SETTINGS.use_llm_fallback else None,
 )
+save_run(results, {e["email_id"]: e for e in emails})
+
 submission = build_submission(results)
 write_submission(submission)
 write_traces(results)
