@@ -4,9 +4,9 @@ from sdoc.gemini import GeminiClient, cache_key, parse_json_response
 
 
 def test_cache_key_is_stable_and_prompt_sensitive():
-    a = cache_key("hello", "gemini-2.0-flash")
-    assert a == cache_key("hello", "gemini-2.0-flash")
-    assert a != cache_key("hello!", "gemini-2.0-flash")
+    a = cache_key("hello", "gemini-3.6-flash")
+    assert a == cache_key("hello", "gemini-3.6-flash")
+    assert a != cache_key("hello!", "gemini-3.6-flash")
     assert a != cache_key("hello", "other-model")
 
 

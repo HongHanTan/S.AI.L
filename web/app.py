@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from sdoc.compare.alias import AliasStore
+from sdoc.firestore_store import FirestoreAliasStore
 from sdoc.models import FIELDS
 from sdoc.results import load_run
 
@@ -21,7 +22,7 @@ class ReviewDecision(BaseModel):
 def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> FastAPI:
     app = FastAPI(title="Shipping Document Verification")
     app.state.run_path = run_path
-    app.state.store = store or AliasStore()
+    app.state.store = store or FirestoreAliasStore()
 
     def run_data() -> dict:
         return load_run(app.state.run_path)

@@ -2620,7 +2620,7 @@ Caching is what makes scoreboard iteration cheap. Build it before any model call
 **Interfaces:**
 - Produces:
   - `sdoc.gemini.cache_key(prompt: str, model: str) -> str`
-  - `sdoc.gemini.GeminiClient(model="gemini-2.0-flash", cache_dir=".cache", api_key=None)` with `.generate_json(prompt: str, *, default: dict | list) -> dict | list`
+  - `sdoc.gemini.GeminiClient(model="gemini-3.6-flash", cache_dir=".cache", api_key=None)` with `.generate_json(prompt: str, *, default: dict | list) -> dict | list`
   - The client tolerates fenced JSON, retries twice on transport errors, and returns `default` rather than raising.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2633,9 +2633,9 @@ from sdoc.gemini import GeminiClient, cache_key, parse_json_response
 
 
 def test_cache_key_is_stable_and_prompt_sensitive():
-    a = cache_key("hello", "gemini-2.0-flash")
-    assert a == cache_key("hello", "gemini-2.0-flash")
-    assert a != cache_key("hello!", "gemini-2.0-flash")
+    a = cache_key("hello", "gemini-3.6-flash")
+    assert a == cache_key("hello", "gemini-3.6-flash")
+    assert a != cache_key("hello!", "gemini-3.6-flash")
     assert a != cache_key("hello", "other-model")
 
 
@@ -2702,7 +2702,7 @@ from pathlib import Path
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 def cache_key(prompt: str, model: str) -> str:

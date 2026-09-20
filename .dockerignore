@@ -1,0 +1,15 @@
+data/
+.cache/
+.aliases/
+tests/
+docs/
+.git/
+__pycache__/
+*.pyc
+.venv/
+venv/
+submission.json
+traces.json
+.env
+progress.md
+.pytest_cache/

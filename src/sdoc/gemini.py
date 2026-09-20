@@ -11,7 +11,7 @@ from pathlib import Path
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 def cache_key(prompt: str, model: str) -> str:
