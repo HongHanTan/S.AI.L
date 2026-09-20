@@ -15,10 +15,29 @@ from sdoc.submit import build_submission, post_submission, write_submission
 from sdoc.trace import layer_counts, write_traces
 
 client = GeminiClient()
+
+if not client.api_key:
+    print(
+        "\n!! GEMINI_API_KEY is not set.\n"
+        "!! Classification will fall back to GENERAL for every email and the\n"
+        "!! score will collapse to the ~0.01 baseline. Set the key and re-run:\n"
+        "!!     set GEMINI_API_KEY=<your key>        (Windows)\n"
+        "!!     export GEMINI_API_KEY=<your key>     (bash)\n",
+        file=sys.stderr,
+    )
+
 emails = load_emails(SETTINGS.data_dir)
 
 mapping = classify_all(emails, client, settings=SETTINGS)
 classifier = make_classifier(mapping)
+
+# A degraded classifier is worth shouting about: every downstream axis depends
+# on routing, so a silent fallback looks like a modelling failure rather than a
+# missing credential.
+routed = sum(1 for c in mapping.values() if c == "BL_COMPARISON")
+if routed == 0:
+    print("!! No email was classified BL_COMPARISON - classification failed.",
+          file=sys.stderr)
 
 results = run(SETTINGS, classifier)
 submission = build_submission(results)

@@ -21,9 +21,9 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 8 | L1 canon + L3 similarity | ✅ done | 105/105 | `97fca50` |
 | 9 | Comparison ladder + rollup | ✅ done | 125/125 | `d259a06` |
 | 10 | Deterministic pipeline, first score | ✅ done | 132/132 +5 integ | `2b563a7` |
-| 11 | Gemini client + cache | ⏳ in progress | — | — |
-| 12 | Gemini classification | ⬜ pending | — | — |
-| 13 | Fallback extraction + L4 | ⬜ pending | — | — |
+| 11 | Gemini client + cache | ✅ done | 139/139 | `73926e0` |
+| 12 | Gemini classification | 🔑 built, needs API key | 147/147 | `f4f1bfc` |
+| 13 | Fallback extraction + L4 | ⏳ in progress | — | — |
 | 14 | Alias promotion + snapshots | ⬜ pending | — | — |
 | 15 | A/B the switches | ⬜ pending | — | — |
 | 16 | Results store + FastAPI | ⬜ pending | — | — |
@@ -107,3 +107,12 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   Gemini takes over next. `missing_attachment` is 2/5 only because the placeholder
   classifier never routes the three zero-attachment cases to the gate — real
   classification should fix that too.
+- **2026-09-20** — **Blocked on a Gemini API key.** Tasks 11-13 are fully built and
+  unit-tested against fake clients, but the live classification run needs
+  `GEMINI_API_KEY`. Without it every email falls back to GENERAL and the score collapses
+  to the 0.0124 baseline. Get a free key at https://aistudio.google.com/apikey then
+  `set GEMINI_API_KEY=<key>` and re-run `PYTHONPATH=src python scripts/run.py http://127.0.0.1:8080`.
+- **2026-09-20** — Added a loud startup warning when the key is missing or when no email
+  routes to BL_COMPARISON. A silent degradation to all-GENERAL would look like a
+  modelling failure rather than a missing credential — and the brief explicitly asks for
+  processing failures to be visible.
