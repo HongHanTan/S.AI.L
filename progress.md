@@ -24,9 +24,9 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 11 | Gemini client + cache | ✅ done | 139/139 | `73926e0` |
 | 12 | Gemini classification | 🔑 built, needs API key | 147/147 | `f4f1bfc` |
 | 13 | Fallback extraction + L4 | 🔑 built, needs API key | 156/156 | `cd0675f` |
-| 14 | Alias promotion + snapshots | ⏳ in progress | — | — |
-| 15 | A/B the switches | ⬜ pending | — | — |
-| 16 | Results store + FastAPI | ⬜ pending | — | — |
+| 14 | Alias promotion + snapshots | ✅ done | 165/165 | `3cfc52f` |
+| 15 | A/B the switches | 🔑 deferred, needs API key | — | — |
+| 16 | Results store + FastAPI | ⏳ in progress | — | — |
 | 17 | The four screens | ⬜ pending | — | — |
 | 18 | Firestore persistence | ⬜ pending | — | — |
 | 19 | Cloud Run deploy | ⬜ pending | — | — |
@@ -116,3 +116,7 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   routes to BL_COMPARISON. A silent degradation to all-GENERAL would look like a
   modelling failure rather than a missing credential — and the brief explicitly asks for
   processing failures to be visible.
+- **2026-09-20** — Task 15 (A/B sweep) deferred until a key exists; it scores four live
+  configurations. Jumping ahead to the web deliverables (Tasks 16-19), which need no key
+  and are **mandatory submission components** — a strong score with no live link scores
+  zero overall.
