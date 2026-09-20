@@ -1,11 +1,13 @@
-"""FastAPI app serving the four demo screens over a precomputed run."""
+"""FastAPI app serving the demo screens over a precomputed run, plus a live
+ad-hoc comparison endpoint for documents uploaded in the browser."""
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from sdoc.adhoc import UploadError, compare_uploads
 from sdoc.compare.alias import AliasStore
 from sdoc.firestore_store import FirestoreAliasStore
 from sdoc.models import FIELDS
@@ -85,6 +87,22 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
         )
         return {"recorded": True, "email_id": email_id, "field": decision.field,
                 "verdict": decision.verdict}
+
+    @app.post("/api/compare")
+    async def compare_documents(
+        files: list[UploadFile] = File(...),  # noqa: B008 - FastAPI dependency
+    ):
+        """Compare two uploaded documents live.
+
+        Deterministic only — no model call — so an API quota can never break
+        this during a demo. Roles are detected from the documents themselves,
+        so the two files may be uploaded in either order.
+        """
+        try:
+            payload = [(f.filename or "document", await f.read()) for f in files]
+            return compare_uploads(payload)
+        except UploadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/stats")
     def stats():

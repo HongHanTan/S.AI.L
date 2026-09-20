@@ -92,3 +92,51 @@ def test_stats_summarise_the_run(client):
     assert body["categories"]["BL_COMPARISON"] == 2
     assert body["statuses"]["MISMATCH"] == 1
     assert body["total"] == 3
+
+
+SI_DOC = b"""SHIPPING INSTRUCTION
+========================================
+
+Shipper: APRIL FAR EAST (M) SDN BHD
+Consignee (Non-Negotiable): EAST BRIGHT FZ-LLC
+Notify: EAST BRIGHT FZ-LLC
+Port of Loading (POL): NANTONG, CHINA (CNNTG)
+POD: KARACHI, PAKISTAN (PKKHI)
+Total Containers: 6 x 40'HC
+Gross Wt (kgs): 131,058 KG
+"""
+
+BL_DOC = SI_DOC.replace(b"SHIPPING INSTRUCTION", b"BILL OF LADING (DRAFT)")
+BL_BAD = BL_DOC.replace(b"Consignee (Non-Negotiable): EAST BRIGHT FZ-LLC",
+                        b"To the Order of: UAB NOVAKOPA")
+
+
+def test_upload_compare_reports_a_mismatch(client):
+    c, _ = client
+    r = c.post("/api/compare", files=[
+        ("files", ("si.txt", SI_DOC, "text/plain")),
+        ("files", ("bl.txt", BL_BAD, "text/plain")),
+    ])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "MISMATCH"
+    assert "consignee" in body["defect_fields"]
+    assert len(body["verdicts"]) == 7
+
+
+def test_upload_compare_reports_a_clean_pair(client):
+    c, _ = client
+    r = c.post("/api/compare", files=[
+        ("files", ("si.txt", SI_DOC, "text/plain")),
+        ("files", ("bl.txt", BL_DOC, "text/plain")),
+    ])
+    assert r.json()["status"] == "OK"
+
+
+def test_upload_compare_rejects_a_single_file(client):
+    c, _ = client
+    r = c.post("/api/compare", files=[
+        ("files", ("si.txt", SI_DOC, "text/plain")),
+    ])
+    assert r.status_code == 400
+    assert "two documents" in r.json()["detail"]

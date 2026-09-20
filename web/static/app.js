@@ -17,6 +17,7 @@ function show(view) {
   if (view === "report") renderReport();
   if (view === "evidence") renderEvidence();
   if (view === "review") renderReview();
+  if (view === "compare") renderCompare();
 }
 
 async function renderStats() {
@@ -157,3 +158,125 @@ document.querySelectorAll("nav button").forEach((b) =>
 
 renderStats();
 renderInbox();
+
+
+// ---------------------------------------------------------------------------
+// Compare documents — runs the real pipeline on two uploaded files.
+// Deterministic only: no model call, so it cannot be rate-limited or time out.
+// ---------------------------------------------------------------------------
+
+function renderCompare() {
+  if (el("compare").dataset.ready) return;
+  el("compare").dataset.ready = "1";
+  el("compare").innerHTML = `
+    <div class="card">
+      <h3>Compare a Shipping Instruction against a draft Bill of Lading</h3>
+      <p class="muted">
+        Upload both documents &mdash; <code>.txt</code>, <code>.pdf</code>,
+        <code>.docx</code> or <code>.xlsx</code>. Order does not matter: the
+        system reads each document's own header to decide which is which.
+        This runs the same extraction and comparison logic as the inbox, with
+        no model call, so the result is immediate and fully deterministic.
+      </p>
+      <p>
+        <label>Document 1 &nbsp;<input type="file" id="cmp-a"></label><br><br>
+        <label>Document 2 &nbsp;<input type="file" id="cmp-b"></label>
+      </p>
+      <p>
+        <button class="action" id="cmp-run">Compare</button>
+        <span class="muted" id="cmp-msg"></span>
+      </p>
+      <div id="cmp-out"></div>
+    </div>`;
+
+  el("cmp-run").addEventListener("click", runCompare);
+}
+
+async function runCompare() {
+  const a = el("cmp-a").files[0];
+  const b = el("cmp-b").files[0];
+  const msg = el("cmp-msg");
+  const out = el("cmp-out");
+
+  if (!a || !b) {
+    msg.textContent = "Pick two documents first.";
+    return;
+  }
+
+  msg.textContent = "Comparing\u2026";
+  out.innerHTML = "";
+
+  const body = new FormData();
+  body.append("files", a);
+  body.append("files", b);
+
+  let d;
+  try {
+    const response = await fetch("/api/compare", { method: "POST", body });
+    d = await response.json();
+    if (!response.ok) {
+      msg.textContent = "";
+      out.innerHTML = `<p class="diff">${esc(d.detail || "Comparison failed.")}</p>`;
+      return;
+    }
+  } catch (err) {
+    msg.textContent = "";
+    out.innerHTML = `<p class="diff">Could not reach the server.</p>`;
+    return;
+  }
+
+  msg.textContent = "";
+  out.innerHTML = renderCompareResult(d);
+}
+
+function renderCompareResult(d) {
+  const roles = (d.documents || [])
+    .map((doc) => {
+      const label = { SI: "Shipping Instruction", BL: "Bill of Lading" }[doc.detected_type]
+        || "not a shipping document";
+      return `<li><code>${esc(doc.filename)}</code> &rarr; ${label}</li>`;
+    })
+    .join("");
+
+  let headline;
+  if (d.status === "MISMATCH") {
+    headline = `<p class="diff">Mismatch in: ${esc(d.defect_fields.join(", "))}</p>`;
+  } else if (d.status === "NEEDS_REVIEW") {
+    headline = `<p class="muted">Sent for review &mdash; ${esc(d.review_reason)}</p>`;
+  } else {
+    headline = `<p class="same">No mismatch detected.</p>`;
+  }
+
+  const notes = (d.notes || [])
+    .map((n) => `<p class="muted">${esc(n)}</p>`)
+    .join("");
+
+  const rows = (d.verdicts || [])
+    .map((v) => {
+      const differs = v.verdict === "DIFFERENT";
+      const missing = v.verdict === "MISSING";
+      const cls = differs ? "diff" : missing ? "muted" : "";
+      return `<tr>
+        <td>${v.field_name}</td>
+        <td class="${cls}">${esc(v.si_value)}</td>
+        <td class="${cls}">${esc(v.bl_value)}</td>
+        <td class="${differs ? "diff" : "same"}">${v.verdict}</td>
+        <td><code>${v.decided_by}</code></td>
+      </tr>`;
+    })
+    .join("");
+
+  const table = rows
+    ? `<div class="table-wrap"><table>
+         <thead><tr><th>Field</th><th>SI value</th><th>BL value</th>
+         <th>Result</th><th>Decided by</th></tr></thead>
+         <tbody>${rows}</tbody></table></div>`
+    : "";
+
+  return `<hr>
+    <p><span class="pill ${d.status}">${d.status}</span></p>
+    <ul class="muted">${roles}</ul>
+    ${headline}
+    ${notes}
+    ${table}`;
+}
