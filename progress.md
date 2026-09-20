@@ -26,10 +26,10 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 13 | Fallback extraction + L4 | 🔑 built, needs API key | 156/156 | `cd0675f` |
 | 14 | Alias promotion + snapshots | ✅ done | 165/165 | `3cfc52f` |
 | 15 | A/B the switches | 🔑 deferred, needs API key | — | — |
-| 16 | Results store + FastAPI | ⏳ in progress | — | — |
-| 17 | The four screens | ⬜ pending | — | — |
-| 18 | Firestore persistence | ⬜ pending | — | — |
-| 19 | Cloud Run deploy | ⬜ pending | — | — |
+| 16 | Results store + FastAPI | ✅ done | 173/173 | `828c447` |
+| 17 | The four screens | ✅ done | 176/176 | `a6918ad` |
+| 18 | Firestore persistence | ⏳ in progress | — | — |
+| 19 | Cloud Run deploy | 🔑 blocked, needs gcloud + GCP project | — | — |
 | 20 | README + deck + video | ⬜ pending | — | — |
 
 ## Scoreboard history
@@ -120,3 +120,10 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   configurations. Jumping ahead to the web deliverables (Tasks 16-19), which need no key
   and are **mandatory submission components** — a strong score with no live link scores
   zero overall.
+- **2026-09-20** — Web demo verified working end to end: all four screens render, the API
+  serves all 520 emails, static assets load. Ran on port 8000 (8080 stays with the
+  scoring server) and stopped cleanly.
+- **2026-09-20** — Second blocker found: **`gcloud` CLI is not installed**, so Task 19
+  (Cloud Run deploy) cannot run. Install the Google Cloud SDK from
+  https://cloud.google.com/sdk/docs/install and have a GCP project ready. The live
+  prototype link is a mandatory submission field.
