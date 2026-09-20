@@ -542,7 +542,7 @@ SHEET_XML = """<?xml version="1.0"?>
 <row r="3"><c r="A3" t="inlineStr"><is><t>BL INSTRUCTION</t></is></c>
            <c r="B3" t="inlineStr"><is><t>3815798123</t></is></c></row>
 <row r="4"><c r="A4" t="inlineStr"><is><t>CONSIGNEE</t></is></c>
-           <c r="B4" t="inlineStr"><is><t>BALL &amp;amp; DOGGETT | 43-45 METRO RD</t></is></c></row>
+           <c r="B4" t="inlineStr"><is><t>BALL &amp; DOGGETT | 43-45 METRO RD</t></is></c></row>
 <row r="5"><c r="A5" t="inlineStr"><is><t>Load Port</t></is></c>
            <c r="B5" t="inlineStr"><is><t>SINGAPORE</t></is></c></row>
 </sheetData></worksheet>"""
@@ -1853,7 +1853,23 @@ The ladder walks Gate 1 → L1 → L2 → L3, with L4 injected as a callable so 
 
 `tests/compare/test_ladder.py`:
 ```python
+import pytest
+
 from sdoc.compare.ladder import compare_field
+
+# Token-set ratio of these two is exactly 0.80 — inside the gray band
+# (0.72, 0.92) and just below the 0.82 midpoint. Every gray-band test below
+# depends on that, so do not change these strings.
+GRAY_A = "ACME GLOBAL TRADING HOLDINGS GROUP"
+GRAY_B = "ACME GLOBAL TRADING HOLDINGS"
+
+
+def test_gray_values_sit_in_the_band():
+    """Guards the fixtures the gray-band tests rely on."""
+    from sdoc.compare.similarity import band, token_set_ratio
+    score = token_set_ratio(GRAY_A, GRAY_B)
+    assert score == pytest.approx(0.80)
+    assert band(score) == "GRAY"
 
 
 def test_numeric_equal_is_same_without_a_model():
@@ -1918,19 +1934,26 @@ def test_gray_band_calls_the_adjudicator():
         seen.update(kwargs)
         return {"verdict": "SAME", "reason": "same entity abbreviated"}
 
-    v = compare_field("shipper", "ACME GLOBAL TRADING HOLDINGS GROUP",
-                      "ACME GLOBAL TRADING HOLDINGS", adjudicator=adjudicator)
-    if v.decided_by == "L4":
-        assert seen["field_name"] == "shipper"
-        assert v.verdict == "SAME"
+    v = compare_field("shipper", GRAY_A, GRAY_B, adjudicator=adjudicator)
+    assert v.decided_by == "L4"
+    assert seen["field_name"] == "shipper"
+    assert v.verdict == "SAME"
 
 
 def test_adjudicator_uncertain_falls_back_to_the_midpoint():
-    v = compare_field("shipper", "ACME GLOBAL TRADING HOLDINGS GROUP",
-                      "ACME GLOBAL TRADING HOLDINGS",
+    """0.80 is below the 0.82 midpoint, so an UNCERTAIN leans DIFFERENT."""
+    v = compare_field("shipper", GRAY_A, GRAY_B,
                       adjudicator=lambda **kw: {"verdict": "UNCERTAIN"})
-    if v.decided_by == "resolver":
-        assert v.verdict in ("SAME", "DIFFERENT")
+    assert v.decided_by == "resolver"
+    assert v.verdict == "DIFFERENT"
+
+
+def test_uncertain_lean_is_switchable():
+    v = compare_field("shipper", GRAY_A, GRAY_B,
+                      adjudicator=lambda **kw: {"verdict": "UNCERTAIN"},
+                      uncertain_lean_same=False)
+    assert v.decided_by == "resolver"
+    assert v.verdict == "DIFFERENT"
 
 
 def test_adjudicator_receives_the_similarity_score():
@@ -1942,11 +1965,9 @@ def test_adjudicator_receives_the_similarity_score():
         seen.update(kwargs)
         return {"verdict": "SAME"}
 
-    v = compare_field("shipper", "ACME GLOBAL TRADING HOLDINGS GROUP",
-                      "ACME GLOBAL TRADING HOLDINGS", adjudicator=adjudicator)
-    if v.decided_by == "L4":
-        assert "similarity" in seen
-        assert 0.0 < seen["similarity"] < 1.0
+    v = compare_field("shipper", GRAY_A, GRAY_B, adjudicator=adjudicator)
+    assert v.decided_by == "L4"
+    assert seen["similarity"] == pytest.approx(0.80)
 
 
 def test_missing_text_value_is_never_a_difference():
@@ -2177,6 +2198,7 @@ First end-to-end run. Classification is still a placeholder heuristic; everythin
 
 **Files:**
 - Create: `src/sdoc/pipeline.py`, `src/sdoc/trace.py`, `scripts/run.py`, `docs/scores.md`
+- Delete: `scripts/baseline.py` — Task 1's throwaway prover, fully superseded by `scripts/run.py`. Remove it in this task's commit rather than leaving dead code behind.
 - Test: `tests/test_pipeline.py`
 
 **Interfaces:**
@@ -2463,6 +2485,7 @@ attributable to a specific decision.
 - [ ] **Step 8: Commit**
 
 ```bash
+git rm scripts/baseline.py
 git add src/sdoc/pipeline.py src/sdoc/trace.py scripts/run.py tests/test_pipeline.py docs/scores.md
 git commit -m "feat: wire the deterministic pipeline and record a real score"
 ```
