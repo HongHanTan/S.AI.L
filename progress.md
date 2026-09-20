@@ -12,8 +12,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | # | Task | Status | Tests | Commits |
 |---|---|---|---|---|
 | 1 | Scaffold + scoreboard loop | ✅ done | 5/5 | `59f08f5` |
-| 2 | Ingestion — txt and pdf | ⏳ in progress | — | — |
-| 3 | Ingestion — docx and xlsx | ⬜ pending | — | — |
+| 2 | Ingestion — txt and pdf | ✅ done | 9/9 | `5b54443` |
+| 3 | Ingestion — docx and xlsx | ⏳ in progress | — | — |
 | 4 | Doc-type detection + gates | ⬜ pending | — | — |
 | 5 | Label normalisation | ⬜ pending | — | — |
 | 6 | Linear + block extractors | ⬜ pending | — | — |
@@ -55,3 +55,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 - **2026-09-20** — Reference targets to aim at: 46 emails carry a real defect (the
   end-to-end axis), 20 are NEEDS_REVIEW (5 each of wrong_doc_type, missing_attachment,
   unreadable, missing_value), 154 are clean.
+- **2026-09-20** — Task 2 implementer caught a contradiction in my test fixture:
+  `"SHIPPER: X"` was itself the third non-empty line, so asserting it was absent
+  from a three-line header was impossible. Verified empirically that a three-line
+  header yields zero false SI detections across all 250 attachments, so the design
+  held and only the fixture needed correcting.

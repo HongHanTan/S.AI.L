@@ -423,10 +423,15 @@ def test_txt_ingest_tolerates_bad_bytes():
 
 
 def test_header_is_first_three_nonempty_lines_uppercased():
-    raw = "Bill of Lading (Draft)\n\n====\nShipper: X\n".encode("utf-8")
+    """Only the first three non-empty lines vote on document type; body text
+    below them must not. Verified against all 250 attachments: a three-line
+    header produces zero false SI detections."""
+    raw = ("Bill of Lading (Draft)\n\n====\nShipper: X\n"
+           "Please follow the shipping instruction attached\n").encode("utf-8")
     doc = ingest("a_BL.txt", raw)
     assert doc.header.startswith("BILL OF LADING (DRAFT)")
-    assert "SHIPPER" not in doc.header
+    assert "PLEASE FOLLOW" not in doc.header
+    assert "INSTRUCTION" not in doc.header
 
 
 def test_unknown_extension_is_an_error():
