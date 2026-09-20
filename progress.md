@@ -18,8 +18,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 5 | Label normalisation | ✅ done | 78/78 | `0b5504d` |
 | 6 | Linear + block extractors | ✅ done | 86/86 | `e80f99e` |
 | 7 | Numeric extraction | ✅ done | 95/95 +5 integ | `58fc327` |
-| 8 | L1 canon + L3 similarity | ⏳ in progress | — | — |
-| 9 | Comparison ladder + rollup | ⬜ pending | — | — |
+| 8 | L1 canon + L3 similarity | ✅ done | 105/105 | `97fca50` |
+| 9 | Comparison ladder + rollup | ⏳ in progress | — | — |
 | 10 | Deterministic pipeline, first score | ⬜ pending | — | — |
 | 11 | Gemini client + cache | ⬜ pending | — | — |
 | 12 | Gemini classification | ⬜ pending | — | — |
@@ -94,3 +94,7 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   **98.0%**, and **zero** summary-vs-table conflicts — where a PDF carries both a summary
   line and a container table, the two independent sources agree every time. All 8 numeric
   gaps are intentional (501-505 wrong-doc, 516/518/519 missing-value).
+- **2026-09-20** — Name-over-address rule validated on the real `email_004`: comparing
+  company names alone scores 0.00 (decisively DIFFERENT) where comparing the whole
+  name+address blob scores 0.60 — uncomfortably close to the gray band. Consignee and
+  notify_party correctly flag; shipper correctly matches.
