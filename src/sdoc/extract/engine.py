@@ -26,3 +26,16 @@ def snippet_for(doc: DocText, field_name: str, width: int = 3) -> str:
             chunk = [x.strip() for x in doc.lines[lo:i + width + 1] if x.strip()]
             return " | ".join(chunk)[:400]
     return ""
+
+
+from sdoc.extract.numeric import extract_numeric_fields
+
+
+def extract_all_fields(doc: DocText) -> dict:
+    """All seven fields plus a _conflict flag from the numeric cross-check."""
+    fields = dict(extract_text_fields(doc))
+    numeric = extract_numeric_fields(doc)
+    fields["container_count"] = numeric["container_count"]
+    fields["gross_weight_kg"] = numeric["gross_weight_kg"]
+    fields["_conflict"] = numeric["_conflict"]
+    return fields
