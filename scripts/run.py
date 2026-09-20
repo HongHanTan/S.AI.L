@@ -38,10 +38,21 @@ classifier = make_classifier(mapping)
 # A degraded classifier is worth shouting about: every downstream axis depends
 # on routing, so a silent fallback looks like a modelling failure rather than a
 # missing credential.
+# run.json is what the deployed demo serves, so a degraded run must not be
+# allowed to overwrite a good one unnoticed. The reference set holds 220
+# comparison emails; anything far below that means classification partly
+# failed, usually because batches were lost to rate limiting.
+ROUTED_FLOOR = 150
+
 routed = sum(1 for c in mapping.values() if c == "BL_COMPARISON")
-if routed == 0:
-    print("!! No email was classified BL_COMPARISON - classification failed.",
-          file=sys.stderr)
+if routed < ROUTED_FLOOR:
+    print(
+        f"\n!! Only {routed} emails classified BL_COMPARISON (expected ~220).\n"
+        "!! Classification was likely degraded by lost batches or rate limits.\n"
+        "!! run.json is what the live demo serves - check `git status` and run\n"
+        "!! `git checkout -- run.json` if this overwrote a good result.\n",
+        file=sys.stderr,
+    )
 
 store = AliasStore()
 alias_table = store.load(SETTINGS.alias_snapshot)
