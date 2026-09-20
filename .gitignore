@@ -1,9 +1,12 @@
 data/
 .cache/
+.aliases/
 submission.json
+traces.json
+run.json
 __pycache__/
 *.pyc
 .env
 venv/
 .venv/
-submission.json
+.superpowers/

@@ -20,8 +20,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 7 | Numeric extraction | ✅ done | 95/95 +5 integ | `58fc327` |
 | 8 | L1 canon + L3 similarity | ✅ done | 105/105 | `97fca50` |
 | 9 | Comparison ladder + rollup | ✅ done | 125/125 | `d259a06` |
-| 10 | Deterministic pipeline, first score | ⏳ in progress | — | — |
-| 11 | Gemini client + cache | ⬜ pending | — | — |
+| 10 | Deterministic pipeline, first score | ✅ done | 132/132 +5 integ | `2b563a7` |
+| 11 | Gemini client + cache | ⏳ in progress | — | — |
 | 12 | Gemini classification | ⬜ pending | — | — |
 | 13 | Fallback extraction + L4 | ⬜ pending | — | — |
 | 14 | Alias promotion + snapshots | ⬜ pending | — | — |
@@ -37,6 +37,7 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | Run | Change | final_score | Notes |
 |---|---|---|---|
 | 1 | baseline, everything GENERAL | **0.0124** | proves the submit loop; stage1 macro-F1 0.041 |
+| 2 | deterministic pipeline, heuristic classifier | **0.7465** | end-to-end 45/46 = 0.978; stage3 F1 0.989 (precision 1.00); stage1 still 0.199 |
 
 ## Notes and decisions
 
@@ -98,3 +99,11 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   company names alone scores 0.00 (decisively DIFFERENT) where comparing the whole
   name+address blob scores 0.60 — uncomfortably close to the gray band. Consignee and
   notify_party correctly flag; shipper correctly matches.
+- **2026-09-20** — First real score: **0.7465**. The deterministic core is close to its
+  ceiling — 45 of 46 defects caught with **zero false positives**, stage-3 F1 0.989,
+  exact-match 0.995. Reliability precision is 1.00 (never escalates wrongly), with
+  wrong_doc_type 5/5 and unreadable 5/5 caught.
+  Remaining headroom is almost entirely stage-1 classification (0.199, worth 30%), which
+  Gemini takes over next. `missing_attachment` is 2/5 only because the placeholder
+  classifier never routes the three zero-attachment cases to the gate — real
+  classification should fix that too.
