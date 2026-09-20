@@ -40,3 +40,10 @@ button.action { padding: 5px 11px; margin-right: 6px; border: 1px solid var(--li
   border-radius: 6px; background: var(--bg); cursor: pointer; font: inherit; }
 button.action:hover { background: var(--ink); color: var(--bg); }
 code { background: #efefe9; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* Try-an-email form */
+.field { width: 100%; max-width: 640px; padding: 8px 10px; margin-top: 4px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  color: var(--ink); font: inherit; }
+textarea.field { resize: vertical; line-height: 1.5; }
+#compare label { display: block; font-weight: 600; font-size: 13px; }

@@ -140,3 +140,40 @@ def test_upload_compare_rejects_a_single_file(client):
     ])
     assert r.status_code == 400
     assert "two documents" in r.json()["detail"]
+
+
+def test_try_email_runs_the_whole_pipeline(client, monkeypatch):
+    import sdoc.adhoc as adhoc
+    monkeypatch.setattr(adhoc, "_default_classifier",
+                        lambda settings: ((lambda e: "BL_COMPARISON"), "stub"))
+    c, _ = client
+    r = c.post("/api/try-email", data={
+        "subject": "TO CONFIRM DOCS", "body": "Please check the attached docs.",
+    }, files=[
+        ("files", ("si.txt", SI_DOC, "text/plain")),
+        ("files", ("bl.txt", BL_BAD, "text/plain")),
+    ])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["category"] == "BL_COMPARISON"
+    assert body["status"] == "MISMATCH"
+    assert "consignee" in body["defect_fields"]
+
+
+def test_try_email_works_with_no_attachments(client, monkeypatch):
+    import sdoc.adhoc as adhoc
+    monkeypatch.setattr(adhoc, "_default_classifier",
+                        lambda settings: ((lambda e: "SPAM"), "stub"))
+    c, _ = client
+    r = c.post("/api/try-email", data={
+        "subject": "Increase your revenue with this ONE weird trick",
+        "body": "Click here.",
+    })
+    assert r.status_code == 200
+    assert r.json()["category"] == "SPAM"
+
+
+def test_try_email_rejects_an_empty_email(client):
+    c, _ = client
+    r = c.post("/api/try-email", data={"subject": "", "body": ""})
+    assert r.status_code == 400

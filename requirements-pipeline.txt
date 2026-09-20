@@ -1,7 +1,6 @@
 # Everything needed to RUN the batch pipeline and the test suite locally.
 -r requirements.txt
 
-google-genai>=0.3             # Gemini classification, fallback extraction, L4
 uvicorn>=0.30                 # local web server
 jinja2>=3.1
 google-cloud-firestore>=2.16  # optional: persists review decisions

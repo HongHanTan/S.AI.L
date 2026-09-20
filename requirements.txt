@@ -1,13 +1,14 @@
 # Web runtime. Vercel installs exactly this.
 #
-# The inbox screens read a precomputed run.json, but the Compare tab runs the
-# real extraction and comparison pipeline on uploaded documents, so the parsers
-# ship too. google-genai is deliberately absent: the upload path is
-# deterministic, so the deployed demo makes no model calls and cannot be
-# broken by an API quota.
+# The inbox screens read a precomputed run.json. The "Try an email" tab runs
+# the real pipeline on a hand-written email, so the document parsers and the
+# Gemini client ship too. Classification degrades to a clearly-labelled
+# heuristic when GEMINI_API_KEY is absent, and document comparison is
+# deterministic either way - so the demo never hard-fails on a quota.
 fastapi>=0.115
 pydantic>=2.0
 python-multipart>=0.0.9
 pymupdf>=1.24
 python-docx>=1.1
 openpyxl>=3.1
+google-genai>=0.3

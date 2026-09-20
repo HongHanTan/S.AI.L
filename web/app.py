@@ -2,12 +2,12 @@
 ad-hoc comparison endpoint for documents uploaded in the browser."""
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from sdoc.adhoc import UploadError, compare_uploads
+from sdoc.adhoc import UploadError, compare_uploads, process_typed_email
 from sdoc.compare.alias import AliasStore
 from sdoc.firestore_store import FirestoreAliasStore
 from sdoc.models import FIELDS
@@ -101,6 +101,25 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
         try:
             payload = [(f.filename or "document", await f.read()) for f in files]
             return compare_uploads(payload)
+        except UploadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/try-email")
+    async def try_email(
+        subject: str = Form(""),
+        body: str = Form(""),
+        sender: str = Form(""),
+        files: list[UploadFile] = File(default=[]),  # noqa: B008
+    ):
+        """Run one hand-written email through the complete pipeline.
+
+        Classification, gating, extraction and comparison — the same
+        `process_email` the 520-email batch run calls. Attachments are
+        optional and unlabelled; the documents say what they are.
+        """
+        try:
+            payload = [(f.filename or "document", await f.read()) for f in files]
+            return process_typed_email(subject, body, sender, payload)
         except UploadError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -108,3 +108,78 @@ def test_no_model_is_ever_called():
     got = compare_uploads([up("si.txt", SI), up("bl.txt", BL_WRONG_CONSIGNEE)])
     assert all(v["decided_by"] in ("gate1", "L1", "L2", "L3")
                for v in got["verdicts"]), got["verdicts"]
+
+
+# --- full typed-email path -------------------------------------------------
+
+from sdoc.adhoc import process_typed_email  # noqa: E402
+
+
+def fixed(category):
+    """A stand-in classifier, so these tests never touch the network."""
+    return lambda email: category
+
+
+def test_typed_email_runs_the_full_pipeline_and_finds_a_defect():
+    got = process_typed_email(
+        subject="TO CONFIRM DOCS _ 5ALT-01226",
+        body="Please check the attached SI and draft BL and confirm.",
+        files=[up("a.txt", SI), up("b.txt", BL_WRONG_CONSIGNEE)],
+        classifier=fixed("BL_COMPARISON"),
+    )
+    assert got["category"] == "BL_COMPARISON"
+    assert got["status"] == "MISMATCH"
+    assert "consignee" in got["defect_fields"]
+
+
+def test_typed_email_classified_away_skips_comparison():
+    got = process_typed_email(
+        subject="Increase your shipping revenue with this ONE weird trick",
+        body="Click here now.",
+        files=[],
+        classifier=fixed("SPAM"),
+    )
+    assert got["category"] == "SPAM"
+    assert got["status"] == "OK"
+    assert got["verdicts"] == []
+
+
+def test_typed_email_claiming_a_dropped_attachment_escalates():
+    got = process_typed_email(
+        subject="RE_ AFRT - LONG BEACH_US",
+        body="Please compare the SI and draft BL and confirm "
+             "(attachments appear to have been dropped).",
+        files=[],
+        classifier=fixed("BL_COMPARISON"),
+    )
+    assert got["status"] == "NEEDS_REVIEW"
+    assert got["review_reason"] == "missing_attachment"
+
+
+def test_typed_comparison_without_attachments_stays_clean():
+    """94 real comparison requests carry nothing and are not defects."""
+    got = process_typed_email(
+        subject="TO CONFIRM DOCS",
+        body="Please compare and confirm. Thank you.",
+        files=[],
+        classifier=fixed("BL_COMPARISON"),
+    )
+    assert got["status"] == "OK"
+    assert got["review_reason"] is None
+
+
+def test_documents_are_role_detected_not_declared():
+    got = process_typed_email(
+        subject="check docs", body="attached",
+        files=[up("second.txt", BL_MATCHING), up("first.txt", SI)],
+        classifier=fixed("BL_COMPARISON"),
+    )
+    types = {d["filename"]: d["detected_type"] for d in got["documents"]}
+    assert types == {"second.txt": "BL", "first.txt": "SI"}
+    assert got["status"] == "OK"
+
+
+def test_an_empty_email_is_rejected():
+    with pytest.raises(UploadError):
+        process_typed_email(subject="   ", body="", files=[],
+                            classifier=fixed("GENERAL"))

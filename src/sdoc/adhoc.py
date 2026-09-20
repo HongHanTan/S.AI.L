@@ -126,3 +126,112 @@ def _describe(doc_type: str) -> str:
         "SI": "Shipping Instruction",
         "BL": "Bill of Lading",
     }.get(doc_type, "different document altogether")
+
+
+# ---------------------------------------------------------------------------
+# Full single-email run: classify, then compare if it is a comparison request.
+# ---------------------------------------------------------------------------
+
+def _fallback_classifier(email: dict) -> str:
+    """Used only when no Gemini credential is configured.
+
+    Deliberately crude, and the caller says so in the response — a weak
+    heuristic presented as real classification would be worse than none.
+    """
+    return "BL_COMPARISON" if email.get("attachments") else "GENERAL"
+
+
+def process_typed_email(
+    subject: str,
+    body: str,
+    sender: str = "",
+    files: list[tuple[str, bytes]] | None = None,
+    classifier=None,
+    settings=None,
+) -> dict:
+    """Run one hand-written email through the complete pipeline.
+
+    This calls the same `pipeline.process_email` the 520-email batch run uses,
+    so what the demo shows is the production path rather than a reimplementation
+    of it. Attachments are optional and unlabelled: whether a document is the
+    Shipping Instruction or the draft Bill of Lading is read from the document
+    itself.
+    """
+    from sdoc.config import Settings
+    from sdoc.pipeline import process_email
+
+    files = files or []
+    settings = settings or Settings()
+
+    for name, raw in files:
+        if not raw:
+            raise UploadError(f"{name} is empty.")
+        if len(raw) > MAX_BYTES:
+            raise UploadError(f"{name} is larger than {MAX_BYTES // (1024 * 1024)} MB.")
+    if not (subject.strip() or body.strip()):
+        raise UploadError("Enter a subject or a body so there is something to classify.")
+
+    by_name = {name: raw for name, raw in files}
+    email = {
+        "email_id": "typed_email",
+        "from": sender.strip(),
+        "subject": subject,
+        "body": body,
+        "attachments": list(by_name),
+    }
+
+    classifier_used = "gemini"
+    if classifier is None:
+        classifier, classifier_used = _default_classifier(settings)
+
+    outcome = process_email(
+        email,
+        settings,
+        classifier,
+        adjudicator=None,           # deterministic comparison, as above
+        read_bytes=lambda path: by_name[path],
+    )
+
+    docs = [ingest(name, raw) for name, raw in files]
+    return {
+        "source": "typed_email",
+        "classifier": classifier_used,
+        "category": outcome.category,
+        "status": outcome.status,
+        "review_reason": outcome.review_reason,
+        "defect_fields": outcome.defect_fields,
+        "verdicts": [asdict(v) for v in outcome.verdicts],
+        "notes": outcome.notes,
+        "documents": [
+            {
+                "filename": d.path,
+                "format": d.fmt,
+                "detected_type": detect_doc_type(d),
+                "error": d.error,
+            }
+            for d in docs
+        ],
+    }
+
+
+def _default_classifier(settings):
+    """Gemini when a key is configured, otherwise an honest fallback."""
+    from sdoc.classify import CATEGORIES, build_prompt
+    from sdoc.gemini import GeminiClient
+
+    client = GeminiClient()
+    if not client.api_key:
+        return _fallback_classifier, "heuristic (no GEMINI_API_KEY configured)"
+
+    def classify_one(email: dict) -> str:
+        reply = client.generate_json(build_prompt([email]), default={})
+        category = reply.get(email["email_id"]) if isinstance(reply, dict) else None
+        if category not in CATEGORIES:
+            return _fallback_classifier(email)
+        if (category == "BL_COMPARISON"
+                and not email.get("attachments")
+                and not settings.attachmentless_is_comparison):
+            return "GENERAL"
+        return category
+
+    return classify_one, "gemini"

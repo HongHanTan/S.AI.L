@@ -170,53 +170,96 @@ function renderCompare() {
   el("compare").dataset.ready = "1";
   el("compare").innerHTML = `
     <div class="card">
-      <h3>Compare a Shipping Instruction against a draft Bill of Lading</h3>
+      <h3>Try an email</h3>
       <p class="muted">
-        Upload both documents &mdash; <code>.txt</code>, <code>.pdf</code>,
-        <code>.docx</code> or <code>.xlsx</code>. Order does not matter: the
-        system reads each document's own header to decide which is which.
-        This runs the same extraction and comparison logic as the inbox, with
-        no model call, so the result is immediate and fully deterministic.
+        Write an email the way a customer would and attach whatever documents
+        it would carry &mdash; or none. This runs the <em>whole</em> pipeline:
+        classification, document typing, extraction, comparison and rollup. It
+        is the same code path the 520-email batch run uses.
+      </p>
+      <p class="muted">
+        You never say which attachment is the Shipping Instruction and which is
+        the draft Bill of Lading. Each document's own header decides, because in
+        real inboxes filenames lie.
       </p>
       <p>
-        <label>Document 1 &nbsp;<input type="file" id="cmp-a"></label><br><br>
-        <label>Document 2 &nbsp;<input type="file" id="cmp-b"></label>
+        <label>From<br>
+          <input type="text" id="cmp-from" class="field"
+                 placeholder="docs@vitalsolutions.sg"></label>
       </p>
       <p>
-        <button class="action" id="cmp-run">Compare</button>
+        <label>Subject<br>
+          <input type="text" id="cmp-subject" class="field"
+                 placeholder="TO CONFIRM DOCS _ 5ALT-01226 _ KARACHI"></label>
+      </p>
+      <p>
+        <label>Body<br>
+          <textarea id="cmp-body" class="field" rows="5"
+                    placeholder="Hi,&#10;&#10;Attached are the SI and draft BL. Please check the details and confirm.&#10;&#10;Thanks"></textarea></label>
+      </p>
+      <p>
+        <label>Attachments (optional, any order)<br>
+          <input type="file" id="cmp-files" multiple></label>
+      </p>
+      <p>
+        <button class="action" id="cmp-run">Process email</button>
+        <button class="action" id="cmp-eg1">Load a comparison example</button>
+        <button class="action" id="cmp-eg2">Load a spam example</button>
         <span class="muted" id="cmp-msg"></span>
       </p>
       <div id="cmp-out"></div>
     </div>`;
 
   el("cmp-run").addEventListener("click", runCompare);
+  el("cmp-eg1").addEventListener("click", () => {
+    el("cmp-from").value = "docs@vitalsolutions.sg";
+    el("cmp-subject").value = "TO CONFIRM DOCS _ 5ALT-01226 _ KARACHI_PAKISTAN";
+    el("cmp-body").value = [
+      "Hi Mitchelle,",
+      "",
+      "Attached are the SI and draft BL for OC 5ALT-01226.",
+      "Please check the details and confirm.",
+      "",
+      "Best Regards,",
+      "Deswita",
+    ].join("\n");
+    el("cmp-msg").textContent = "Now attach an SI and a BL, then Process email.";
+  });
+  el("cmp-eg2").addEventListener("click", () => {
+    el("cmp-from").value = "offers@quick-cargo-deals.biz";
+    el("cmp-subject").value = "Increase your shipping revenue with this ONE weird trick";
+    el("cmp-body").value = "Click here now to unlock unlimited freight discounts!";
+    el("cmp-msg").textContent = "No attachments needed - just Process email.";
+  });
 }
 
 async function runCompare() {
-  const a = el("cmp-a").files[0];
-  const b = el("cmp-b").files[0];
   const msg = el("cmp-msg");
   const out = el("cmp-out");
+  const subject = el("cmp-subject").value;
+  const body = el("cmp-body").value;
 
-  if (!a || !b) {
-    msg.textContent = "Pick two documents first.";
+  if (!subject.trim() && !body.trim()) {
+    msg.textContent = "Write a subject or a body first.";
     return;
   }
 
-  msg.textContent = "Comparing\u2026";
+  msg.textContent = "Processing…";
   out.innerHTML = "";
 
-  const body = new FormData();
-  body.append("files", a);
-  body.append("files", b);
+  const form = new FormData();
+  form.append("subject", subject);
+  form.append("body", body);
+  form.append("sender", el("cmp-from").value);
+  for (const f of el("cmp-files").files) form.append("files", f);
 
   let d;
   try {
-    const response = await fetch("/api/compare", { method: "POST", body });
+    const response = await fetch("/api/try-email", { method: "POST", body: form });
     d = await response.json();
     if (!response.ok) {
       msg.textContent = "";
-      out.innerHTML = `<p class="diff">${esc(d.detail || "Comparison failed.")}</p>`;
+      out.innerHTML = `<p class="diff">${esc(d.detail || "Processing failed.")}</p>`;
       return;
     }
   } catch (err) {
@@ -243,9 +286,18 @@ function renderCompareResult(d) {
     headline = `<p class="diff">Mismatch in: ${esc(d.defect_fields.join(", "))}</p>`;
   } else if (d.status === "NEEDS_REVIEW") {
     headline = `<p class="muted">Sent for review &mdash; ${esc(d.review_reason)}</p>`;
+  } else if (d.category && d.category !== "BL_COMPARISON") {
+    headline = `<p class="same">Not a document-comparison request, so no
+      comparison was run.</p>`;
   } else {
     headline = `<p class="same">No mismatch detected.</p>`;
   }
+
+  const classified = d.category
+    ? `<p><b>Classified as</b> <span class="pill ${d.status}">${esc(d.category)}</span>
+       ${d.classifier && d.classifier !== "gemini"
+         ? `<span class="muted">&nbsp;(${esc(d.classifier)})</span>` : ""}</p>`
+    : "";
 
   const notes = (d.notes || [])
     .map((n) => `<p class="muted">${esc(n)}</p>`)
@@ -274,8 +326,9 @@ function renderCompareResult(d) {
     : "";
 
   return `<hr>
-    <p><span class="pill ${d.status}">${d.status}</span></p>
-    <ul class="muted">${roles}</ul>
+    ${classified}
+    <p><b>Outcome</b> <span class="pill ${d.status}">${d.status}</span></p>
+    ${roles ? `<p class="muted">Documents read as:</p><ul class="muted">${roles}</ul>` : ""}
     ${headline}
     ${notes}
     ${table}`;
