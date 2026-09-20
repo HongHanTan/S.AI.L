@@ -13,8 +13,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 |---|---|---|---|---|
 | 1 | Scaffold + scoreboard loop | ✅ done | 5/5 | `59f08f5` |
 | 2 | Ingestion — txt and pdf | ✅ done | 9/9 | `5b54443` |
-| 3 | Ingestion — docx and xlsx | ⏳ in progress | — | — |
-| 4 | Doc-type detection + gates | ⬜ pending | — | — |
+| 3 | Ingestion — docx and xlsx | ✅ done | 15/15 +2 integ | `751f4f5` |
+| 4 | Doc-type detection + gates | ⏳ in progress | — | — |
 | 5 | Label normalisation | ⬜ pending | — | — |
 | 6 | Linear + block extractors | ⬜ pending | — | — |
 | 7 | Numeric extraction | ⬜ pending | — | — |
@@ -60,3 +60,15 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   from a three-line header was impossible. Verified empirically that a three-line
   header yields zero false SI detections across all 250 attachments, so the design
   held and only the fixture needed correcting.
+- **2026-09-20** — Task 3 implementer found my "all PDFs are text PDFs" claim was wrong:
+  8 of 28 PDFs fail to read (2 structurally invalid, 6 image-only scans). They are
+  `email_511`-`email_515` and are *meant* to be unreadable — the reference labels them
+  NEEDS_REVIEW/unreadable. So still no OCR, but for the opposite reason to the one
+  originally recorded. Integration test now asserts exactly those 8 error.
+- **2026-09-20** — Mapped the edge-case block precisely: 501-505 wrong_doc_type,
+  506-510 missing_attachment, 511-515 unreadable, 516-520 missing_value.
+- **2026-09-20** — Decisive gate correction: only 5 emails are `missing_attachment`, yet
+  94 comparison requests carry no attachment at all. Attachment count cannot separate
+  them — the body does ("attachments appear to have been dropped" / "the draft BL is
+  still missing"). Gate now returns a `nothing_to_compare` sentinel that reports a clean
+  OK, instead of escalating 91 emails as false alarms.

@@ -38,7 +38,7 @@ Measured directly against the bundle, not assumed:
 |---|---|
 | 520 emails; **126 have attachments** (124 pairs, 2 SI-only) | Comparison work is bounded. Classification over 520 is the bulk of the workload. |
 | Attachment formats: 192 `.txt`, 28 `.pdf`, 22 `.xlsx`, 8 `.docx` | `.xlsx` appears **only** in `loader.py`'s docstring — absent from the use-case PDF. Silent scoring hole if unhandled. |
-| PDFs are **ReportLab-generated text PDFs** | PyMuPDF extracts cleanly. **No OCR or vision pipeline required.** |
+| **20 of 28 PDFs are ReportLab text PDFs; 8 are not** — 2 structurally invalid, 6 image-only scans (`email_511`–`email_515`) | PyMuPDF extracts the 20 cleanly. The 8 are *meant* to be unreadable: the reference set labels them `NEEDS_REVIEW`/`unreadable`, so detecting them beats OCR-ing them. Still no OCR pipeline — but for the opposite reason to the one first recorded here. |
 | ~45 distinct field labels observed | Enumerable; a label map resolves the large majority deterministically. |
 | PDFs carry a container table **and** summary lines | Two independent sources per numeric field, cross-checkable (verified: 6 × 21,887 = 131,322). |
 | `TO CONFIRM DOCS…` subjects appear both with and without attachments | Whether an attachment-less one is `BL_COMPARISON` or `GENERAL` is unknowable a priori — must be a tunable switch. |
@@ -405,8 +405,9 @@ fields, and a strong score with no live link scores zero overall. Phase 3 is whe
 
 ## 16. Explicitly out of scope
 
-- **OCR / vision pipeline.** The PDFs are text. This was the largest item in the "advanced
-  stage" and the data removes it.
+- **OCR / vision pipeline.** Six image-only PDFs exist, but the reference set labels them
+  `NEEDS_REVIEW`/`unreadable` — they are a reliability test, not a reading test. OCR-ing
+  them would convert a correct escalation into a guess. Detect, don't decode.
 - **Retry/backoff infrastructure beyond a simple bounded retry.** 126 comparisons is small.
 - **Any handling for email formats beyond the provided JSON records.**
 
