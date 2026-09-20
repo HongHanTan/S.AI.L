@@ -190,7 +190,8 @@ involve a model.
   Parties drop legal suffixes (`PTE LTD`, `SDN BHD`, `CO LTD`, `INC`, `GMBH`, `FZ-LLC`,
   `PTY LTD`) and flatten addresses. Equal → SAME.
 - **L2 — alias lookup.** Both sides resolve to a canonical key via a table that starts empty
-  and grows from L4 verdicts and human confirmations. Same key → SAME.
+  and grows from L4 verdicts and human confirmations (see *Feedback loop* below).
+  Same key → SAME.
 - **L3 — similarity bands.** Token-set ratio: ≥ 0.92 → SAME, ≤ 0.72 → DIFFERENT,
   between → L4. The band stays narrow deliberately; uncertainty has no exit, so a wider band
   only buys more calls that still must resolve.
@@ -198,6 +199,40 @@ involve a model.
   Classifies a relationship (`SAME` / `DIFFERENT` / `UNCERTAIN`); never produces a value.
 - **Resolver.** `UNCERTAIN` does not escalate — it falls back to the similarity score against
   the 0.82 band midpoint. Every one is logged to the review queue regardless.
+
+### Feedback loop — the alias table grows
+
+Every L4 verdict and every human review decision is logged, and confirmed matches are
+promoted into L2 so the layer gets cheaper and more deterministic each run.
+
+**Promotion rule.** A pair is promoted to a shared canonical key when:
+
+- the verdict is `SAME`, **and**
+- it came from an L4 adjudication or a human confirmation, **and**
+- token-set similarity ≥ **0.85** (the guard — blocks a confident-sounding model verdict on
+  two genuinely unlike strings from poisoning the table), **and**
+- no human has ever recorded `DIFFERENT` for that pair.
+
+A human `DIFFERENT` is authoritative: it removes any existing alias link and writes a
+permanent negative entry that blocks future promotion of that pair. Human decisions outrank
+model decisions, always.
+
+**Storage.** Firestore is the system of record; a local JSON mirror lets the batch pipeline
+run without network access. Each entry records the pair, canonical key, source
+(`l4` / `human`), similarity at promotion, and timestamp — so any alias can be audited or
+rolled back.
+
+**Reproducibility — the snapshot pin.** A growing table makes runs stateful: two identical
+invocations could otherwise produce different submissions, destroying the attributable score
+deltas that §13 depends on. Therefore:
+
+- Every scored run **pins a table snapshot** (`--alias-snapshot <id>`) and treats it as
+  read-only. Promotions during the run are written to a pending queue, not the live table.
+- Promotion is an **explicit step between runs** (`python -m sdoc.aliases promote`), which
+  creates a new numbered snapshot.
+- The score log records which snapshot produced each score.
+
+This keeps the learning loop real while keeping A/B tests of the §9 switches honest.
 
 **Party comparison weights name over address.** `email_004` has SI consignee
 `EAST BRIGHT FZ-LLC` against BL `UAB NOVAKOPA` at an *identical address*. Naive whole-blob
@@ -257,7 +292,7 @@ src/sdoc/
   extract/llm.py         Gemini fallback extraction
   compare/gates.py       document-defect gates
   compare/canon.py       L1
-  compare/alias.py       L2
+  compare/alias.py       L2 — lookup, promotion rule, snapshot pinning
   compare/similarity.py  L3
   compare/adjudicate.py  L4 — Gemini adjudicator
   compare/rollup.py      precedence
@@ -346,9 +381,10 @@ attributable score delta.
 | 1 | 1–6 | Ingest (txt/pdf/docx/xlsx) + deterministic extract + compare | Score on 50% + 20% axes |
 | 2 | 6–12 | Gemini classification, batched + cached | 30% axis jumps |
 | 3 | 12–18 | L3/L4, fallback extraction, A/B both switches | Best score locked |
-| 4 | 18–30 | Cloud Run deploy, four screens, Firestore | Live link works |
-| 5 | 30–40 | README, slide deck, ≤5 min video | All four mandatory components exist |
-| 6 | 40–48 | Buffer | Submit early |
+| 3b | 18–21 | Alias table: promotion rule, snapshots, Firestore mirror | Snapshot N+1 scores ≥ snapshot N |
+| 4 | 21–32 | Cloud Run deploy, four screens, Firestore write-back | Live link works |
+| 5 | 32–42 | README, slide deck, ≤5 min video | All four mandatory components exist |
+| 6 | 42–48 | Buffer | Submit early |
 
 If time collapses, phases 4 and 5 are non-negotiable — they are mandatory submission form
 fields, and a strong score with no live link scores zero overall. Phase 3 is where we cut.
@@ -371,9 +407,6 @@ fields, and a strong score with no live link scores zero overall. Phase 3 is whe
 
 - **OCR / vision pipeline.** The PDFs are text. This was the largest item in the "advanced
   stage" and the data removes it.
-- **Alias-table auto-promotion above the 0.85 similarity guard.** Averis.pdf's self-improving
-  loop accrues value over many runs; we have one. The table still grows from human review for
-  the demo.
 - **Retry/backoff infrastructure beyond a simple bounded retry.** 126 comparisons is small.
 - **Any handling for email formats beyond the provided JSON records.**
 
@@ -388,4 +421,7 @@ fields, and a strong score with no live link scores zero overall. Phase 3 is whe
 3. All four attachment formats parse; no email fails with an unhandled exception.
 4. The Cloud Run URL is publicly reachable and serves all four screens.
 5. A reviewer can resolve a `NEEDS_REVIEW` case in the UI and see the report update.
-6. All five mandatory submission components exist before the 22 Sep 2026 12:00pm deadline.
+6. A reviewer's confirmation promotes an alias into the table, and the next snapshot resolves
+   that pair at L2 without an L4 call — demonstrable as a drop in L4 call count between two
+   consecutive snapshots on the same input.
+7. All five mandatory submission components exist before the 22 Sep 2026 12:00pm deadline.
