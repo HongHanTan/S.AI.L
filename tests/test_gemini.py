@@ -90,3 +90,13 @@ def test_retry_hint_is_parsed_from_the_error():
     err = RuntimeError("429 RESOURCE_EXHAUSTED ... Please retry in 52.837381773s.")
     assert retry_after_seconds(err) == pytest.approx(52.837, rel=1e-3)
     assert retry_after_seconds(RuntimeError("429 quota exceeded")) is None
+
+
+def test_client_survives_a_read_only_cache_directory(monkeypatch, tmp_path):
+    """Serverless hosts mount a read-only filesystem; a cache that cannot be
+    created must not stop the client being constructed."""
+    monkeypatch.setenv("SDOC_CACHE_DIR", "Z:/nonexistent-readonly/cache")
+    client = GeminiClient(api_key="unused")
+    assert client.cache_dir.exists()
+    client._call = lambda p: '{"ok": true}'
+    assert client.generate_json("P", default={}) == {"ok": True}

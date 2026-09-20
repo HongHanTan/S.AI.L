@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import time
 from pathlib import Path
 
@@ -81,8 +82,15 @@ class GeminiClient:
                  backoff_seconds: float = DEFAULT_BACKOFF,
                  max_backoff_seconds: float = MAX_BACKOFF):
         self.model = model
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # Serverless hosts mount a read-only filesystem apart from a temp dir.
+        # The cache is an optimisation, never a requirement, so fall back
+        # rather than failing at import time.
+        self.cache_dir = Path(os.environ.get("SDOC_CACHE_DIR", cache_dir))
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.cache_dir = Path(tempfile.gettempdir()) / "sdoc-cache"
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.retries = retries
         self.min_interval = min_interval
@@ -146,7 +154,10 @@ class GeminiClient:
                 self.failures += 1
                 continue
             if parsed is not None:
-                path.write_text(json.dumps(parsed), encoding="utf-8")
+                try:
+                    path.write_text(json.dumps(parsed), encoding="utf-8")
+                except OSError:
+                    pass  # caching is an optimisation, not a requirement
                 return parsed
             self.failures += 1
         return default

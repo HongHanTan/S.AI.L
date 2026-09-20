@@ -219,7 +219,10 @@ def _default_classifier(settings):
     from sdoc.classify import CATEGORIES, build_prompt
     from sdoc.gemini import GeminiClient
 
-    client = GeminiClient()
+    # Tuned for an interactive request, not a batch run: one attempt, no
+    # throttle, no long backoff. A serverless function times out long before
+    # a rate-limit window reopens, so waiting would just hang the page.
+    client = GeminiClient(retries=1, min_interval=0, backoff_seconds=0)
     if not client.api_key:
         return _fallback_classifier, "heuristic (no GEMINI_API_KEY configured)"
 
