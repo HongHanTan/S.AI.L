@@ -34,8 +34,31 @@ _VARIANTS: dict[str, list[str]] = {
     "gross_weight_kg": [
         "Gross Wt (kgs)", "Gross Weight (KG)", "Gross Weight", "Gross Wt",
         "TOTAL Gross Wt (kgs)", "Total Gross Weight", "Gross Weight (KGS)",
+        # PyMuPDF extracts the CJK run in "TOTAL Gross Weight<CJK>(KGS)" as a
+        # literal ASCII "II" because the embedded font carries no ToUnicode
+        # map. Eight PDFs are affected; without this variant each of them
+        # falsely reports a missing gross weight.
+        "TOTAL Gross WeightII(KGS)",
     ],
 }
+
+# Labels the documents use that are NOT one of the seven compared fields.
+# In the PDF block layout a value runs until the next label, so these have to
+# terminate a value just as a field label does — otherwise "Port of Discharge"
+# swallows the vessel name that follows it. Address fragments ("P.O. BOX",
+# "TEL") are deliberately excluded: those appear *inside* party values.
+NON_FIELD_LABELS: frozenset[str] = frozenset({
+    "B L NO", "B L NUMBER", "BILL OF LADING", "BILL OF LADING NO",
+    "BL INSTRUCTION", "BL NO", "BOOKING NO", "BOOKING REF",
+    "BOOKING REFERENCE", "BUYER", "CERTIFICATE NO", "COMMODITY",
+    "CONTAINER NO", "COUNTRY OF ORIGIN", "DESCRIPTION",
+    "DESCRIPTION OF GOODS", "EXPORT CARRIER", "EXPORTER", "FREIGHT",
+    "HS CODE", "INCOTERMS", "INVOICE DATE", "INVOICE NO",
+    "ISSUING AUTHORITY", "KINDS OF PACKAGES DESCRIPTION OF GOODS",
+    "NET WEIGHT", "NEW NO", "OC NO", "OCEAN VESSEL", "ORDER NO",
+    "PAYMENT TERMS", "SELLER", "TOTAL AMOUNT", "VESSEL", "VESSEL NAME",
+    "VOY", "VOY NO", "VOYAGE", "VOYAGE NO",
+})
 
 
 def normalize_label(raw: str) -> str:
@@ -54,3 +77,28 @@ for _field, _labels in _VARIANTS.items():
 
 def field_for_label(raw: str) -> str | None:
     return LABEL_TO_FIELD.get(normalize_label(raw))
+
+
+MAX_LABEL_LEN = 45
+
+
+def is_label_line(raw: str) -> bool:
+    """True when a line is, or begins with, any known document label.
+
+    The block extractor uses this to end a value: in a PDF the value under
+    "Port of Discharge" must stop at "Ocean Vessel", which is a real label
+    even though it is not one of the seven compared fields. The prefix check
+    matters because PDFs also collapse those labels onto their values, as in
+    "Export Carrier (vessel, voyage)SOLID 16 V.044NW2".
+    """
+    line = (raw or "").strip()
+    if not line:
+        return False
+    normalized = normalize_label(line)
+    if normalized in LABEL_TO_FIELD or normalized in NON_FIELD_LABELS:
+        return True
+    for end in range(1, min(len(line), MAX_LABEL_LEN) + 1):
+        prefix = normalize_label(line[:end])
+        if prefix in LABEL_TO_FIELD or prefix in NON_FIELD_LABELS:
+            return True
+    return False

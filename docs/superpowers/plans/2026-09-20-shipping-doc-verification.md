@@ -1425,6 +1425,29 @@ git commit -m "feat: linear and block field extractors with evidence snippets"
 
 ---
 
+### Task 6 amendments (applied during implementation)
+
+Three defects surfaced only against the real PDFs and were fixed in code:
+
+1. **Boundary vocabulary.** `_is_boundary` originally stopped only at the seven compared
+   fields, so `Port of Discharge` swallowed the `Ocean Vessel` line beneath it. Added
+   `labels.NON_FIELD_LABELS` (39 real document labels the corpus uses but we never
+   compare) and `labels.is_label_line`. Address fragments (`P.O. BOX`, `TEL`) are
+   deliberately excluded — they appear *inside* party values.
+2. **Collapsed label/value lines.** PDFs sometimes run a label straight into its value
+   with no separator: `Consignee (Non-Negotiable) BALL & DOGGETT AUSTRALIA PTY LTD`.
+   `block._split_label_prefix` now takes the longest matching label prefix and treats the
+   remainder as the value. Five BL attachments lost their consignee before this.
+3. **`is_label_line` prefix matching.** Non-field labels are collapsed too
+   (`Export Carrier (vessel, voyage)SOLID 16 V.044NW2`), so the boundary test matches on
+   prefix, not whole line.
+
+Measured result: text-field extraction covers **1189/1210 = 98.3%**. The 21 remaining
+gaps are all intentional — `email_501`–`email_505` are wrong-document-type, and
+`email_519`/`email_520` are the missing-value block.
+
+---
+
 ## Task 7: Numeric extraction with table cross-check
 
 This fixes the second bug found in the prior plan. In PDFs the container count and gross weight live in a table — `parse number + unit` on a labelled line never fires. Three sources are consulted and cross-checked.

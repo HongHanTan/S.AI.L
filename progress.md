@@ -16,8 +16,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 3 | Ingestion — docx and xlsx | ✅ done | 15/15 +2 integ | `751f4f5` |
 | 4 | Doc-type detection + gates | ✅ done | 35/35 +4 integ | `af91d54` |
 | 5 | Label normalisation | ✅ done | 78/78 | `0b5504d` |
-| 6 | Linear + block extractors | ⏳ in progress | — | — |
-| 7 | Numeric extraction | ⬜ pending | — | — |
+| 6 | Linear + block extractors | ✅ done | 86/86 | `pending` |
+| 7 | Numeric extraction | ⏳ in progress | — | — |
 | 8 | L1 canon + L3 similarity | ⬜ pending | — | — |
 | 9 | Comparison ladder + rollup | ⬜ pending | — | — |
 | 10 | Deterministic pipeline, first score | ⬜ pending | — | — |
@@ -79,3 +79,11 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 - **2026-09-20** — Label map verified against the real corpus: 61 distinct label
   spellings resolve to the 7 canonical fields; the 53 ignored ones are all genuinely
   irrelevant (Freight, HS Code, Vessel, Voyage, Booking Ref).
+- **2026-09-20** — Task 6 implementer reported BLOCKED rather than patching around a
+  spec contradiction, which was the right call and surfaced three real PDF-layout
+  defects: values ran past non-field labels like `Ocean Vessel`; PDFs collapse a label
+  onto its value with no separator (`Consignee (Non-Negotiable) BALL & DOGGETT...`),
+  which was costing 5 attachments their consignee; and a PDF font without a ToUnicode
+  map extracts the CJK weight label as literal `II`, affecting 8 documents. All fixed.
+  Text-field extraction now covers **1189/1210 = 98.3%**, with every remaining gap
+  intentional.
