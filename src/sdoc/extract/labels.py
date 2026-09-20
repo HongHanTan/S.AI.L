@@ -34,11 +34,6 @@ _VARIANTS: dict[str, list[str]] = {
     "gross_weight_kg": [
         "Gross Wt (kgs)", "Gross Weight (KG)", "Gross Weight", "Gross Wt",
         "TOTAL Gross Wt (kgs)", "Total Gross Weight", "Gross Weight (KGS)",
-        # PyMuPDF extracts the CJK run in "TOTAL Gross Weight<CJK>(KGS)" as a
-        # literal ASCII "II" because the embedded font carries no ToUnicode
-        # map. Eight PDFs are affected; without this variant each of them
-        # falsely reports a missing gross weight.
-        "TOTAL Gross WeightII(KGS)",
     ],
 }
 
@@ -75,8 +70,49 @@ for _field, _labels in _VARIANTS.items():
         LABEL_TO_FIELD[normalize_label(_label)] = _field
 
 
+# A label may arrive with a short run of junk appended — a PDF font without a
+# ToUnicode map renders the CJK in "Gross Weight<CJK>(KGS)" as a literal "II",
+# and OCR-style noise behaves the same way. Anything longer than this is a
+# genuinely different label ("SHIPPER REFERENCE" is not "SHIPPER"), so the
+# allowance stays deliberately tight.
+MAX_LABEL_NOISE = 3
+
+
 def field_for_label(raw: str) -> str | None:
-    return LABEL_TO_FIELD.get(normalize_label(raw))
+    """Resolve a label spelling to one of the seven fields.
+
+    Exact match first. Failing that, a known label followed by a few
+    unrecognised characters is treated as that label with reading noise —
+    which generalises to any parser artifact, rather than hard-coding the one
+    this corpus happens to contain.
+    """
+    normalized = normalize_label(raw)
+    if not normalized:
+        return None
+
+    field = LABEL_TO_FIELD.get(normalized)
+    if field:
+        return field
+
+    best: tuple[int, str] | None = None
+    for known, known_field in LABEL_TO_FIELD.items():
+        if len(normalized) <= len(known):
+            continue
+        if normalized[:len(known)] != known:
+            continue
+        # Do not strip first: a *leading* space means the remainder is a new
+        # word rather than noise, so "CONSIGNEE BA" must not resolve by
+        # eating the start of the value that follows the label.
+        noise = normalized[len(known):]
+        if " " in noise or not noise or len(noise) > MAX_LABEL_NOISE:
+            continue
+        # Noise must also be small *relative* to the label, or a short
+        # acronym swallows unrelated words: "POD" + "IUM" is not a port.
+        if len(noise) * 4 > len(known):
+            continue
+        if best is None or len(known) > best[0]:
+            best = (len(known), known_field)
+    return best[1] if best else None
 
 
 MAX_LABEL_LEN = 45

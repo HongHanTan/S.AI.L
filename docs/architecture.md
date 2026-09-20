@@ -123,6 +123,57 @@ auditable rather than a black box.
 
 ---
 
+## Validated limitation: dependence on the label lexicon
+
+The label map was enumerated from this corpus, so coverage measured on this
+corpus flatters itself. Rather than assert that the system generalises, we
+measured how far it does not.
+
+`scripts/generalization.py` holds out a random share of the known label
+spellings, rebuilds the lookup table without them, and re-runs extraction over
+all 242 readable attachments. A held-out spelling stands in for one a new
+shipping line would use and we never anticipated. Results are the mean of three
+seeds:
+
+| Label spellings held out | Field coverage | Change |
+|---:|---:|---:|
+| 0% | 0.980 | — |
+| 10% | 0.907 | −0.073 |
+| 25% | 0.722 | −0.258 |
+| 40% | 0.653 | −0.327 |
+| 50% | 0.541 | −0.439 |
+
+**Removing half the known spellings costs 44% of coverage — close to a linear
+dependence.** Deterministic extraction is exactly as good as the lexicon it was
+given, and this quantifies the gap instead of hand-waving it.
+
+Per-field at 40% holdout, the fragility is uneven:
+
+| Field | Coverage | |
+|---|---:|---|
+| `port_of_discharge` | 0.215 | fewest spellings, falls hardest |
+| `gross_weight_kg` | 0.310 | |
+| `container_count` | 0.727 | |
+| `port_of_loading` | 0.756 | |
+| `shipper` | 0.773 | |
+| `notify_party` | 0.979 | |
+| `consignee` | 0.992 | most spellings, most robust |
+
+Robustness tracks how many spellings a field carries: a random holdout usually
+leaves `consignee` one it still recognises, while `port_of_discharge` runs out.
+Those are the two fields to widen first when onboarding a new customer.
+
+**Two mitigations already exist in the design**, and this measurement is what
+justifies them. The Gemini fallback extractor fills fields the parser misses —
+it is deliberately excluded from the numbers above so they reflect the
+deterministic layer alone. And labels are matched tolerantly: a known label
+followed by a short run of unrecognised characters still resolves, which is how
+`TOTAL Gross Weight<CJK>(KGS)` is handled after a PDF font renders the CJK as a
+literal `II`. That is a general rule about parser noise, not a hard-coded
+spelling for one corpus.
+
+---
+
 ## Implementation Details
 
 ### Content-Hash Disk Cache
