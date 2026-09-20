@@ -34,3 +34,28 @@ def test_only_the_known_bad_attachments_fail_to_ingest():
 @pytest.mark.integration
 def test_attachment_count_matches_expectation():
     assert len(list((DATA / "attachments").iterdir())) == 250
+
+
+from sdoc.doctype import detect_doc_type
+
+WRONG_DOC_EMAILS = {"email_501", "email_502", "email_503", "email_504", "email_505"}
+
+
+@pytest.mark.integration
+def test_all_pdf_shipping_instructions_detect_as_SI():
+    # email_512/513/514_SI.pdf are image-only scans already established as
+    # unreadable in EXPECTED_UNREADABLE above (doc.error set, no lines) —
+    # detection has no header to read on those, so they are excluded here.
+    for p in sorted((DATA / "attachments").glob("*_SI.pdf")):
+        if p.name in EXPECTED_UNREADABLE:
+            continue
+        doc = ingest(str(p), p.read_bytes())
+        assert detect_doc_type(doc) == "SI", f"{p.name} misdetected"
+
+
+@pytest.mark.integration
+def test_known_wrong_documents_detect_as_other():
+    for eid in sorted(WRONG_DOC_EMAILS):
+        p = DATA / "attachments" / f"{eid}_BL.txt"
+        doc = ingest(str(p), p.read_bytes())
+        assert detect_doc_type(doc) == "OTHER", f"{p.name} should be OTHER"
