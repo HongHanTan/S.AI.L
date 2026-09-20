@@ -11,7 +11,7 @@ def test_shipping_instruction_header():
 
 
 def test_bill_of_lading_instruction_is_an_SI_not_a_BL():
-    """All 14 PDF SIs in the bundle use this header. Ordering matters."""
+    """All 13 PDF SIs in the bundle use this header. Ordering matters."""
     assert detect_doc_type(doc("a_SI.pdf", "BILL OF LADING INSTRUCTION")) == "SI"
 
 

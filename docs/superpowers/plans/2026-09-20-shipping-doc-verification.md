@@ -32,7 +32,7 @@ These were verified directly and the code depends on them:
 |---|---|
 | Emails / with attachments | 520 / 126 (124 pairs, 2 SI-only: `email_507`, `email_509`) |
 | Attachment formats | 192 `.txt`, 28 `.pdf`, 22 `.xlsx`, 8 `.docx` |
-| SI header variants | `SHIPPING INSTRUCTION` (txt), `BILL OF LADING INSTRUCTION` (all 14 pdf), `BL INSTRUCTION` (xlsx) |
+| SI header variants | `SHIPPING INSTRUCTION` (txt), `BILL OF LADING INSTRUCTION` (all 13 pdf), `BL INSTRUCTION` (xlsx) |
 | BL header variants | `BILL OF LADING (DRAFT)` (txt/pdf/docx), `BILL OF LADING` (xlsx) |
 | Wrong-doc-type files | `email_501_BL.txt` (COMMERCIAL INVOICE), `email_502_BL.txt` + `email_504_BL.txt` (PACKING LIST), `email_503_BL.txt` + `email_505_BL.txt` (CERTIFICATE OF ORIGIN) |
 | Non-ASCII label | `Gross Weight毛重(KGS)` — 51 files. Only one such variant. |
@@ -758,7 +758,7 @@ git commit -m "feat: ingest docx and xlsx attachments, with stdlib xlsx fallback
 
 ## Task 4: Doc-type detection, role assignment, and gates
 
-This task fixes the first bug found in the prior plan. All 14 PDF Shipping Instructions are headed `BILL OF LADING INSTRUCTION`; a substring test for `BILL OF LADING` before `INSTRUCTION` destroys every PDF comparison.
+This task fixes the first bug found in the prior plan. All 13 PDF Shipping Instructions are headed `BILL OF LADING INSTRUCTION`; a substring test for `BILL OF LADING` before `INSTRUCTION` destroys every PDF comparison.
 
 **Files:**
 - Create: `src/sdoc/doctype.py`, `src/sdoc/gates.py`
@@ -788,7 +788,7 @@ def test_shipping_instruction_header():
 
 
 def test_bill_of_lading_instruction_is_an_SI_not_a_BL():
-    """All 14 PDF SIs in the bundle use this header. Ordering matters."""
+    """All 13 PDF SIs in the bundle use this header. Ordering matters."""
     assert detect_doc_type(doc("a_SI.pdf", "BILL OF LADING INSTRUCTION")) == "SI"
 
 
@@ -1023,7 +1023,7 @@ def test_known_wrong_documents_detect_as_other():
 ```
 
 Run: `pytest tests/docs -v -m integration`
-Expected: PASS — 14 PDF SIs detect as SI, 5 known bad documents detect as OTHER.
+Expected: PASS — the 10 readable PDF SIs detect as SI (3 image-only ones are skipped as already-unreadable), and the 5 known bad documents detect as OTHER.
 
 - [ ] **Step 7: Commit**
 
@@ -4696,7 +4696,7 @@ All four mandatory submission components. Nothing here is optional — a missing
 
 - **Technical architecture** — the pipeline, the L1→L4 ladder, the GCP services and why each is there.
 - **Implementation details** — "code extracts and decides; the model classifies, rescues, and adjudicates"; the label map; numeric cross-checking; the alias promotion guard and snapshot pinning.
-- **Challenges faced** — the `BILL OF LADING INSTRUCTION` header that would have destroyed all 14 PDF comparisons; `Gross Weight毛重(KGS)` in 51 files; xlsx attachments documented nowhere but a docstring; container counts living in tables rather than on labelled lines; making a learning alias table reproducible enough to A/B test.
+- **Challenges faced** — the `BILL OF LADING INSTRUCTION` header that would have destroyed every PDF comparison; `Gross Weight毛重(KGS)` in 51 files; xlsx attachments documented nowhere but a docstring; container counts living in tables rather than on labelled lines; making a learning alias table reproducible enough to A/B test.
 - **Future roadmap** — OCR for genuinely scanned documents, alias table across runs, active learning from the review queue, direct mail-server integration, multi-tenant deployment.
 
 - [ ] **Step 3: Write the demo video script**

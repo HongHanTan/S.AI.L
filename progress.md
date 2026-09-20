@@ -14,8 +14,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 1 | Scaffold + scoreboard loop | ✅ done | 5/5 | `59f08f5` |
 | 2 | Ingestion — txt and pdf | ✅ done | 9/9 | `5b54443` |
 | 3 | Ingestion — docx and xlsx | ✅ done | 15/15 +2 integ | `751f4f5` |
-| 4 | Doc-type detection + gates | ⏳ in progress | — | — |
-| 5 | Label normalisation | ⬜ pending | — | — |
+| 4 | Doc-type detection + gates | ✅ done | 35/35 +4 integ | `af91d54` |
+| 5 | Label normalisation | ⏳ in progress | — | — |
 | 6 | Linear + block extractors | ⬜ pending | — | — |
 | 7 | Numeric extraction | ⬜ pending | — | — |
 | 8 | L1 canon + L3 similarity | ⬜ pending | — | — |
@@ -72,3 +72,7 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   them — the body does ("attachments appear to have been dropped" / "the draft BL is
   still missing"). Gate now returns a `nothing_to_compare` sentinel that reports a clean
   OK, instead of escalating 91 emails as false alarms.
+- **2026-09-20** — Task 4 verified Averis.pdf's ordering bug is fixed: all 10 readable
+  PDF Shipping Instructions (headed `BILL OF LADING INSTRUCTION`) detect as SI, zero
+  misdetections. Implementer also corrected my stale count — there are 13 `*_SI.pdf`
+  files, not 14, of which 3 are the image-only scans.
