@@ -9,6 +9,7 @@ Human decisions outrank model decisions: a human DIFFERENT removes any existing
 link and permanently blocks that pair from being promoted again.
 """
 import json
+import os
 from pathlib import Path
 
 from sdoc.compare.canon import canon_party
@@ -21,8 +22,11 @@ def _pair_key(a: str, b: str) -> str:
 
 
 class AliasStore:
-    def __init__(self, root: str = ".aliases"):
-        self.root = Path(root)
+    def __init__(self, root: str | None = None):
+        # Serverless hosts mount a read-only filesystem apart from a temp dir,
+        # so the mirror location has to be overridable. Firestore remains the
+        # system of record; this is only the local cache of pending decisions.
+        self.root = Path(root or os.environ.get("SDOC_ALIAS_DIR", ".aliases"))
         self.root.mkdir(parents=True, exist_ok=True)
         self.pending_path = self.root / "pending.jsonl"
         self.blocked_path = self.root / "blocked.json"

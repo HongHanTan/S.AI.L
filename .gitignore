@@ -3,7 +3,6 @@ data/
 .aliases/
 submission.json
 traces.json
-run.json
 __pycache__/
 *.pyc
 .env
