@@ -2,32 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shipping Document Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SDOC Freight Operations Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1>Shipping Document Verification</h1>
-    <nav>
-      <button data-view="inbox" class="active">Inbox</button>
-      <button data-view="report">Report</button>
-      <button data-view="evidence">Evidence</button>
-      <button data-view="review">Review queue</button>
-      <button data-view="compare">Try an email</button>
-    </nav>
+<div class="wrap">
+
+  <header class="top">
+    <div class="top-in">
+      <div class="station">
+        <h1>Freight Operations Portal</h1>
+        <p class="lede">Shipping instruction &middot; draft bill of lading verification</p>
+      </div>
+      <div class="station-id">
+        <span class="sid">SDOC // DESK-01</span>
+        <span class="sysline" id="sysline" role="status">
+          <span class="sysdot" id="sysdot" aria-hidden="true"></span>
+          <span id="systext">Connecting&hellip;</span>
+        </span>
+        <button class="theme" id="theme" type="button" aria-label="Colour theme"></button>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Workspaces">
+      <button class="tab" role="tab" id="tab-overview" data-view="overview"
+              aria-controls="overview" aria-selected="true" tabindex="0">
+        OVERVIEW</button>
+      <button class="tab" role="tab" id="tab-inbox" data-view="inbox"
+              aria-controls="inbox" aria-selected="false" tabindex="-1">
+        TRIAGE BOARD <span class="k" id="tab-inbox-count"></span></button>
+      <button class="tab attn" role="tab" id="tab-review" data-view="review"
+              aria-controls="review" aria-selected="false" tabindex="-1">
+        REVIEW QUEUE <span class="k" id="tab-review-count"></span></button>
+      <button class="tab" role="tab" id="tab-compare" data-view="compare"
+              aria-controls="compare" aria-selected="false" tabindex="-1">
+        TRY AN EMAIL</button>
+    </div>
   </header>
 
-  <section id="stats"></section>
+  <div class="filters" id="filters" role="group" aria-label="Filter by check result">
+    <span class="scope" id="filter-scope" aria-hidden="true">BL_COMPARISON</span>
+    <button class="chip s" data-status="" aria-pressed="true">
+      All <span class="k" id="f-all"></span></button>
+    <button class="chip s m" data-status="MISMATCH" aria-pressed="false">
+      Mismatch found <span class="k" id="f-mismatch"></span></button>
+    <button class="chip s r" data-status="NEEDS_REVIEW" aria-pressed="false">
+      Needs review <span class="k" id="f-review"></span></button>
+    <button class="chip s c" data-status="OK" aria-pressed="false">
+      Cleared <span class="k" id="f-ok"></span></button>
+  </div>
 
-  <main>
-    <div id="inbox" class="view"></div>
-    <div id="report" class="view" hidden></div>
-    <div id="evidence" class="view" hidden></div>
-    <div id="review" class="view" hidden></div>
-    <div id="compare" class="view" hidden></div>
-  </main>
+  <div class="subbar" id="subbar" role="group" aria-label="Filter by review reason"></div>
 
-  <script src="/static/app.js"></script>
+  <section id="overview" class="view" role="tabpanel" aria-labelledby="tab-overview" tabindex="-1"></section>
+  <main id="inbox" class="view" role="tabpanel" aria-labelledby="tab-inbox" tabindex="-1" hidden></main>
+  <section id="review" class="view" role="tabpanel" aria-labelledby="tab-review" tabindex="-1" hidden></section>
+  <section id="compare" class="view" role="tabpanel" aria-labelledby="tab-compare" tabindex="-1" hidden></section>
+
+  <section id="detail" class="view" role="region" aria-labelledby="detail-title" tabindex="-1" hidden>
+    <div class="detail-top">
+      <div class="detail-bar">
+        <button class="back" id="detail-back" type="button">
+          <span aria-hidden="true">&larr;</span> Back</button>
+        <span class="crumb" id="detail-crumb"></span>
+      </div>
+      <div class="detail-head">
+        <div class="detail-ident">
+          <h2 class="bk3" id="detail-title"></h2>
+          <p class="rt" id="detail-route" hidden></p>
+          <p class="subj" id="detail-subject"></p>
+        </div>
+        <div class="detail-pills" id="detail-pills"></div>
+      </div>
+    </div>
+
+    <div class="detail-body">
+      <div class="col-left">
+        <section class="panel" aria-labelledby="overview-caption">
+          <h3 id="overview-caption">Case overview</h3>
+          <div id="detail-why"></div>
+          <dl id="detail-summary"></dl>
+        </section>
+
+        <section class="panel" id="original" aria-labelledby="original-caption">
+          <h3 id="original-caption">Original email</h3>
+          <dl id="original-meta"></dl>
+          <pre class="raw" id="original-body"></pre>
+          <div class="lg" id="original-legend" hidden>
+            <span><i class="a"></i>Check request</span>
+            <span><i class="b"></i>Problem signal</span>
+            <span><i class="c2"></i>SI content</span>
+          </div>
+          <ul class="fl" id="original-files"></ul>
+        </section>
+      </div>
+
+      <div class="col-right">
+        <section class="panel" id="report" aria-labelledby="report-caption" hidden>
+          <h3 id="report-caption">Field comparison</h3>
+          <div class="table-wrap">
+            <table class="cmp">
+              <thead>
+                <tr>
+                  <th scope="col" class="c-field">Field</th>
+                  <th scope="col" class="c-si">SI (reference)</th>
+                  <th scope="col" class="c-bl">Draft BL</th>
+                  <th scope="col" class="c-by">Decided by</th>
+                </tr>
+              </thead>
+              <tbody id="report-body"></tbody>
+            </table>
+          </div>
+          <p class="legend" id="evidence-legend">
+            <b>Evidence trace.</b> Each field exits at the first layer that can settle it &mdash;
+            direct compare, canonical match, the alias table, similarity scoring, then model
+            adjudication. An earlier exit is a cheaper and more certain one.
+          </p>
+          <div id="detail-notes"></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="/static/app.js"></script>
 </body>
 </html>

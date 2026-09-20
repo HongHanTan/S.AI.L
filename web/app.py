@@ -1,6 +1,9 @@
 """FastAPI app serving the demo screens over a precomputed run, plus a live
 ad-hoc comparison endpoint for documents uploaded in the browser."""
-from pathlib import Path
+import json
+import os
+import re
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -14,6 +17,55 @@ from sdoc.models import FIELDS
 from sdoc.results import load_run
 
 WEB_DIR = Path(__file__).parent
+ROOT = WEB_DIR.parent
+
+# An email_id is only ever a run.json key, but it arrives from the URL, so it
+# is validated before it is ever joined onto a filesystem path.
+_EMAIL_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _resolve_inbox(explicit: str | None) -> Path | None:
+    """Where the organiser bundle's email records live, if they are here at all.
+
+    The deployed app ships only run.json, so this is normally absent and every
+    caller has to cope with that.
+    """
+    candidates = [explicit] if explicit else [os.environ.get("SDOC_INBOX_DIR")]
+    candidates += [str(ROOT / "data" / "inbox"), str(ROOT / "inbox")]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_dir():
+            return Path(candidate)
+    return None
+
+
+def _original_email(inbox_dir: Path | None, email_id: str) -> dict:
+    """The raw body and attachment names for one email, best-effort.
+
+    Strictly read-only and purely for inspection: the scored run stays the
+    system of record, so a missing, malformed or unreadable inbox file returns
+    nothing rather than changing what the API reports about the pipeline.
+    """
+    if inbox_dir is None or not _EMAIL_ID.match(email_id):
+        return {}
+    path = inbox_dir / f"{email_id}.json"
+    try:
+        # The regex already forbids separators; this also refuses a symlink
+        # that points outside the inbox.
+        if path.resolve().parent != inbox_dir.resolve():
+            return {}
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(record, dict):
+        return {}
+    attachments = record.get("attachments") or []
+    if not isinstance(attachments, list):
+        attachments = []
+    return {
+        "body": str(record.get("body") or ""),
+        "attachment_names": [PurePosixPath(str(a)).name for a in attachments if a],
+    }
+
 
 
 class ReviewDecision(BaseModel):
@@ -21,10 +73,12 @@ class ReviewDecision(BaseModel):
     verdict: str
 
 
-def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> FastAPI:
+def create_app(run_path: str = "run.json", store: AliasStore | None = None,
+               inbox_dir: str | None = None) -> FastAPI:
     app = FastAPI(title="Shipping Document Verification")
     app.state.run_path = run_path
     app.state.store = store or FirestoreAliasStore()
+    app.state.inbox_dir = _resolve_inbox(inbox_dir)
 
     def run_data() -> dict:
         return load_run(app.state.run_path)
@@ -53,7 +107,10 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
         rec = run_data().get(email_id)
         if rec is None:
             raise HTTPException(status_code=404, detail="unknown email_id")
-        return {"email_id": email_id, **rec}
+        # Enrichment is additive only: it can add body/attachment_names, never
+        # override what the run concluded.
+        return {"email_id": email_id, **rec,
+                **_original_email(app.state.inbox_dir, email_id)}
 
     @app.get("/api/review-queue")
     def review_queue():

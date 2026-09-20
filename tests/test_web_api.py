@@ -177,3 +177,69 @@ def test_try_email_rejects_an_empty_email(client):
     c, _ = client
     r = c.post("/api/try-email", data={"subject": "", "body": ""})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Original-email enrichment. Read-only, best-effort, and never able to change
+# what the scored run concluded.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def inbox_client(tmp_path):
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(RUN), encoding="utf-8")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "email_004.json").write_text(json.dumps({
+        "email_id": "email_004", "from": "ops@example.test", "subject": "Check docs",
+        "body": "Please compare the SI and draft BL.",
+        "attachments": ["attachments/si_004.pdf", "attachments/bl_004.pdf"],
+    }), encoding="utf-8")
+    return TestClient(create_app(run_path=str(run_path),
+                                 store=AliasStore(root=str(tmp_path / "aliases")),
+                                 inbox_dir=str(inbox)))
+
+
+def test_detail_includes_body_and_attachment_names(inbox_client):
+    body = inbox_client.get("/api/emails/email_004").json()
+    assert body["body"] == "Please compare the SI and draft BL."
+    assert body["attachment_names"] == ["si_004.pdf", "bl_004.pdf"]
+
+
+def test_enrichment_never_overrides_the_scored_run(inbox_client):
+    body = inbox_client.get("/api/emails/email_004").json()
+    assert body["status"] == "MISMATCH"
+    assert body["defect_fields"] == ["consignee"]
+    assert len(body["verdicts"]) == 2
+
+
+def test_detail_works_when_the_email_has_no_inbox_file(inbox_client):
+    body = inbox_client.get("/api/emails/email_001").json()
+    assert body["status"] == "OK"
+    assert "body" not in body
+
+
+def test_detail_works_when_there_is_no_inbox_at_all(client):
+    c, _ = client
+    body = c.get("/api/emails/email_004").json()
+    assert body["defect_fields"] == ["consignee"]
+    assert "body" not in body
+
+
+def test_malformed_inbox_file_is_ignored_rather_than_raising(tmp_path):
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(RUN), encoding="utf-8")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "email_004.json").write_text("{not json", encoding="utf-8")
+    c = TestClient(create_app(run_path=str(run_path),
+                              store=AliasStore(root=str(tmp_path / "aliases")),
+                              inbox_dir=str(inbox)))
+    assert c.get("/api/emails/email_004").json()["status"] == "MISMATCH"
+
+
+@pytest.mark.parametrize("email_id", [
+    "../run", "..%2frun", "email_004/../../run", "a" * 65, "email 004",
+])
+def test_ids_that_are_not_run_keys_are_404_not_file_reads(inbox_client, email_id):
+    assert inbox_client.get(f"/api/emails/{email_id}").status_code in (404, 400)
