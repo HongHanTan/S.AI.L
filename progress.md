@@ -15,8 +15,8 @@ Ground truth is never read — scoring goes through `POST /submit` only.
 | 2 | Ingestion — txt and pdf | ✅ done | 9/9 | `5b54443` |
 | 3 | Ingestion — docx and xlsx | ✅ done | 15/15 +2 integ | `751f4f5` |
 | 4 | Doc-type detection + gates | ✅ done | 35/35 +4 integ | `af91d54` |
-| 5 | Label normalisation | ⏳ in progress | — | — |
-| 6 | Linear + block extractors | ⬜ pending | — | — |
+| 5 | Label normalisation | ✅ done | 78/78 | `0b5504d` |
+| 6 | Linear + block extractors | ⏳ in progress | — | — |
 | 7 | Numeric extraction | ⬜ pending | — | — |
 | 8 | L1 canon + L3 similarity | ⬜ pending | — | — |
 | 9 | Comparison ladder + rollup | ⬜ pending | — | — |
@@ -76,3 +76,6 @@ Ground truth is never read — scoring goes through `POST /submit` only.
   PDF Shipping Instructions (headed `BILL OF LADING INSTRUCTION`) detect as SI, zero
   misdetections. Implementer also corrected my stale count — there are 13 `*_SI.pdf`
   files, not 14, of which 3 are the image-only scans.
+- **2026-09-20** — Label map verified against the real corpus: 61 distinct label
+  spellings resolve to the 7 canonical fields; the 53 ignored ones are all genuinely
+  irrelevant (Freight, HS Code, Vessel, Voyage, Booking Ref).
