@@ -1,0 +1,42 @@
+:root {
+  --bg: #f7f7f5; --panel: #fff; --ink: #1c1c1a; --muted: #6b6b66;
+  --line: #e2e2dd; --ok: #1a7f57; --bad: #b3261e; --warn: #9a6400;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 16px 48px; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 0 12px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+nav button { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; }
+nav button.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+#stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 20px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; min-width: 110px; }
+.tile b { display: block; font-size: 20px; }
+.tile span { color: var(--muted); font-size: 12px; }
+table { width: 100%; border-collapse: collapse; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+th { background: #efefe9; font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+.table-wrap { overflow-x: auto; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; }
+.OK { background: #e3f3ec; color: var(--ok); }
+.MISMATCH { background: #fbe6e4; color: var(--bad); }
+.NEEDS_REVIEW { background: #fbf0d9; color: var(--warn); }
+.row-click { cursor: pointer; }
+.row-click:hover { background: #fafaf7; }
+.diff { color: var(--bad); font-weight: 600; }
+.same { color: var(--muted); }
+.muted { color: var(--muted); }
+.card { background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+.card h3 { margin: 0 0 10px; font-size: 15px; }
+button.action { padding: 5px 11px; margin-right: 6px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); cursor: pointer; font: inherit; }
+button.action:hover { background: var(--ink); color: var(--bg); }
+code { background: #efefe9; padding: 1px 5px; border-radius: 4px; font-size: 12px; }

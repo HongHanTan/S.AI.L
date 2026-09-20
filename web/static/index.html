@@ -1,1 +1,31 @@
-<h1>Shipping Document Verification</h1>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shipping Document Verification</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Shipping Document Verification</h1>
+    <nav>
+      <button data-view="inbox" class="active">Inbox</button>
+      <button data-view="report">Report</button>
+      <button data-view="evidence">Evidence</button>
+      <button data-view="review">Review queue</button>
+    </nav>
+  </header>
+
+  <section id="stats"></section>
+
+  <main>
+    <div id="inbox" class="view"></div>
+    <div id="report" class="view" hidden></div>
+    <div id="evidence" class="view" hidden></div>
+    <div id="review" class="view" hidden></div>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
