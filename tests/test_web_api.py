@@ -86,12 +86,68 @@ def test_posting_a_review_for_an_unknown_field_is_400(client):
                   json={"field": "nonexistent", "verdict": "SAME"}).status_code == 400
 
 
+def test_the_app_shell_must_be_revalidated(client):
+    """The shell names unversioned assets, so caching it pins the client to an
+    old build regardless of what /static serves."""
+    c, _ = client
+    r = c.get("/")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-cache"
+
+
+def test_static_assets_must_be_revalidated(client):
+    """Unversioned filenames plus heuristic caching means a browser can keep
+    running a stale bundle after a deploy; no-cache forces a revalidation."""
+    c, _ = client
+    for asset in ("/static/app.js", "/static/style.css"):
+        r = c.get(asset)
+        assert r.status_code == 200, asset
+        assert r.headers["cache-control"] == "no-cache", asset
+        assert r.headers.get("etag"), asset
+
+
 def test_stats_summarise_the_run(client):
     c, _ = client
     body = c.get("/api/stats").json()
     assert body["categories"]["BL_COMPARISON"] == 2
     assert body["statuses"]["MISMATCH"] == 1
     assert body["total"] == 3
+
+
+def test_stats_band_the_similarity_scores(client):
+    """The dashboard reads this instead of fetching every record's verdicts."""
+    c, _ = client
+    sim = c.get("/api/stats").json()["similarity"]
+    # The fixture has one scored verdict (L3, 0.1) and one unscored (L1, None).
+    assert sim["scored"] == 1
+    assert sim["bands"] == {"DIFFERENT": 1, "GRAY": 0, "SAME": 0}
+
+
+def test_stats_similarity_ignores_verdicts_without_a_score(client):
+    """gate1 and L1 settle without ever computing a ratio, so they are not
+    silently banded as DIFFERENT at 0.0."""
+    c, _ = client
+    body = c.get("/api/stats").json()
+    assert body["layers"]["L1"] == 1          # the unscored verdict is still counted
+    assert sum(body["similarity"]["bands"].values()) == body["similarity"]["scored"] == 1
+
+
+def test_stats_publish_the_pipelines_own_thresholds(client):
+    """Hardcoding 0.72/0.92 in the frontend would let the chart drift away from
+    the values the comparison actually ran at."""
+    from sdoc.compare.similarity import DIFFERENT_AT, SAME_AT
+    c, _ = client
+    sim = c.get("/api/stats").json()["similarity"]
+    assert sim["different_at"] == DIFFERENT_AT
+    assert sim["same_at"] == SAME_AT
+
+
+def test_stats_similarity_is_additive(client):
+    """The existing keys must survive the addition."""
+    c, _ = client
+    body = c.get("/api/stats").json()
+    assert set(body) == {"total", "categories", "statuses", "layers", "similarity"}
+    assert body["total"] == 3 and body["layers"]["L3"] == 1
 
 
 SI_DOC = b"""SHIPPING INSTRUCTION

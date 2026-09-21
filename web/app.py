@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from sdoc.adhoc import UploadError, compare_uploads, process_typed_email
 from sdoc.compare.alias import AliasStore
+from sdoc.compare.similarity import DIFFERENT_AT, SAME_AT, band
 from sdoc.firestore_store import FirestoreAliasStore
 from sdoc.models import FIELDS
 from sdoc.results import load_run
@@ -186,13 +187,22 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None,
         categories: dict[str, int] = {}
         statuses: dict[str, int] = {}
         layers: dict[str, int] = {}
+        # Only L3 verdicts carry a score; gate1 and L1 settle without one.
+        bands = {"DIFFERENT": 0, "GRAY": 0, "SAME": 0}
+        scored = 0
         for rec in data.values():
             categories[rec["category"]] = categories.get(rec["category"], 0) + 1
             statuses[rec["status"]] = statuses.get(rec["status"], 0) + 1
             for v in rec.get("verdicts", []):
                 layers[v["decided_by"]] = layers.get(v["decided_by"], 0) + 1
+                score = v.get("similarity")
+                if score is not None:
+                    bands[band(score)] += 1
+                    scored += 1
         return {"total": len(data), "categories": categories,
-                "statuses": statuses, "layers": layers}
+                "statuses": statuses, "layers": layers,
+                "similarity": {"scored": scored, "bands": bands,
+                               "different_at": DIFFERENT_AT, "same_at": SAME_AT}}
 
     @app.get("/", response_class=HTMLResponse)
     def index():
@@ -204,11 +214,31 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None,
                 status_code=500,
                 detail=f"index.html missing from the deployment at {page}",
             )
-        return page.read_text(encoding="utf-8")
+        # Same reasoning as the static mount: the shell names unversioned
+        # assets, so if the shell itself is heuristically cached the client can
+        # stay pinned to an old build no matter what /static now serves.
+        return HTMLResponse(page.read_text(encoding="utf-8"),
+                            headers={"cache-control": "no-cache"})
+
+    class RevalidatedStatic(StaticFiles):
+        """Serve the bundle with `no-cache`, meaning "revalidate every time".
+
+        StaticFiles sends only ETag and Last-Modified. With no Cache-Control a
+        browser falls back to heuristic freshness and may reuse app.js without
+        asking, so a plain reload can keep running a stale bundle after a
+        deploy. The filenames are unversioned, so revalidation is the only way
+        to guarantee the client is on the code that was shipped. The ETag still
+        makes the common case a 304 with an empty body.
+        """
+
+        async def get_response(self, path, scope):
+            response = await super().get_response(path, scope)
+            response.headers.setdefault("cache-control", "no-cache")
+            return response
 
     static_dir = WEB_DIR / "static"
     if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        app.mount("/static", RevalidatedStatic(directory=str(static_dir)), name="static")
 
     return app
 

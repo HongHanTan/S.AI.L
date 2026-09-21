@@ -6,7 +6,10 @@
   <title>SDOC Freight Operations Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <noscript><link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -15,36 +18,32 @@
   <header class="top">
     <div class="top-in">
       <div class="station">
+        <span class="brand" id="brand" aria-hidden="true"></span>
         <h1>Freight Operations Portal</h1>
-        <p class="lede">Shipping instruction &middot; draft bill of lading verification</p>
+        <!-- The only surviving feed signal: no text, but a failed boot still
+             shows, and screen readers get it through the label. -->
+        <span class="sysdot" id="sysdot" role="status" aria-label="Connecting"></span>
       </div>
-      <div class="station-id">
-        <span class="sid">SDOC // DESK-01</span>
-        <span class="sysline" id="sysline" role="status">
-          <span class="sysdot" id="sysdot" aria-hidden="true"></span>
-          <span id="systext">Connecting&hellip;</span>
-        </span>
-        <button class="theme" id="theme" type="button" aria-label="Colour theme"></button>
-      </div>
+      <button class="theme" id="theme" type="button" aria-label="Colour theme"></button>
     </div>
 
     <div class="tabs" role="tablist" aria-label="Workspaces">
       <button class="tab" role="tab" id="tab-overview" data-view="overview"
               aria-controls="overview" aria-selected="true" tabindex="0">
-        OVERVIEW</button>
+        <span class="tab-i" aria-hidden="true"></span>OVERVIEW</button>
       <button class="tab" role="tab" id="tab-inbox" data-view="inbox"
               aria-controls="inbox" aria-selected="false" tabindex="-1">
-        TRIAGE BOARD <span class="k" id="tab-inbox-count"></span></button>
+        <span class="tab-i" aria-hidden="true"></span>CATEGORY BOARD <span class="k" id="tab-inbox-count"></span></button>
       <button class="tab attn" role="tab" id="tab-review" data-view="review"
               aria-controls="review" aria-selected="false" tabindex="-1">
-        REVIEW QUEUE <span class="k" id="tab-review-count"></span></button>
+        <span class="tab-i" aria-hidden="true"></span>REVIEW QUEUE <span class="k" id="tab-review-count"></span></button>
       <button class="tab" role="tab" id="tab-compare" data-view="compare"
               aria-controls="compare" aria-selected="false" tabindex="-1">
-        TRY AN EMAIL</button>
+        <span class="tab-i" aria-hidden="true"></span>TRY AN EMAIL</button>
     </div>
   </header>
 
-  <div class="filters" id="filters" role="group" aria-label="Filter by check result">
+  <div class="filters" id="filters" role="group" aria-label="Filter by check result" hidden>
     <span class="scope" id="filter-scope" aria-hidden="true">BL_COMPARISON</span>
     <button class="chip s" data-status="" aria-pressed="true">
       All <span class="k" id="f-all"></span></button>
@@ -69,6 +68,7 @@
         <button class="back" id="detail-back" type="button">
           <span aria-hidden="true">&larr;</span> Back</button>
         <span class="crumb" id="detail-crumb"></span>
+        <div class="detail-nav" id="detail-nav"></div>
       </div>
       <div class="detail-head">
         <div class="detail-ident">
@@ -76,16 +76,20 @@
           <p class="rt" id="detail-route" hidden></p>
           <p class="subj" id="detail-subject"></p>
         </div>
-        <div class="detail-pills" id="detail-pills"></div>
+        <div class="detail-side">
+          <div class="detail-pills" id="detail-pills"></div>
+          <div class="detail-actions" id="detail-actions"></div>
+        </div>
       </div>
     </div>
 
-    <div class="detail-body">
+    <div class="detail-body" id="detail-body">
       <div class="col-left">
         <section class="panel" aria-labelledby="overview-caption">
           <h3 id="overview-caption">Case overview</h3>
           <div id="detail-why"></div>
           <dl id="detail-summary"></dl>
+          <div id="detail-notes"></div>
         </section>
 
         <section class="panel" id="original" aria-labelledby="original-caption">
@@ -122,7 +126,6 @@
             direct compare, canonical match, the alias table, similarity scoring, then model
             adjudication. An earlier exit is a cheaper and more certain one.
           </p>
-          <div id="detail-notes"></div>
         </section>
       </div>
     </div>
