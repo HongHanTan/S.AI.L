@@ -821,6 +821,8 @@ async function renderReview() {
 
 /* ---------------------------------------------------------------- try view */
 
+const tryPreviews = new Map();
+
 function renderTry() {
   const target = el("view-try");
   if (target.dataset.ready) return;
@@ -854,9 +856,28 @@ function renderTry() {
           <textarea class="textarea" id="cmp-body"
             placeholder="Hi,&#10;&#10;Attached are the SI and draft BL. Please check the details and confirm.&#10;&#10;Thanks"></textarea>
         </div>
+        <div class="context-grid">
+          <div class="field-group"><label for="cmp-carrier">Carrier</label>
+            <input class="input auto-input" id="cmp-carrier" readonly placeholder="Auto-detected"></div>
+          <div class="field-group"><label for="cmp-origin">Origin country</label>
+            <input class="input auto-input mono" id="cmp-origin" readonly placeholder="Auto"></div>
+          <div class="field-group"><label for="cmp-destination">Destination country</label>
+            <input class="input auto-input mono" id="cmp-destination" readonly placeholder="Auto"></div>
+        </div>
+        <div class="party-grid">
+          <div class="field-group"><label for="cmp-shipper">Shipper</label>
+            <textarea class="textarea auto-input party-input" id="cmp-shipper" readonly
+              placeholder="Auto-detected from SI"></textarea></div>
+          <div class="field-group"><label for="cmp-consignee">Consignee</label>
+            <textarea class="textarea auto-input party-input" id="cmp-consignee" readonly
+              placeholder="Auto-detected from SI"></textarea></div>
+        </div>
+        <p class="muted" id="cmp-context-msg" style="font-size:12px;margin:7px 0 0">
+          Carrier, route and parties will be extracted from the attachments.</p>
         <div class="field-group">
           <label for="cmp-files">Attachments &mdash; optional, any order</label>
           <input type="file" id="cmp-files" multiple>
+          <div class="upload-list" id="cmp-file-list"></div>
         </div>
 
         <div class="btn-row">
@@ -871,9 +892,17 @@ function renderTry() {
         ${emptyState("i-play", "No result yet",
           "Fill in the form and press Process email. The result appears here.")}
       </div>
-    </div>`;
+    </div>
+    <dialog class="attachment-dialog" id="attachment-preview">
+      <div class="attachment-dialog-head"><div><h2 id="preview-name">Attachment</h2>
+        <p class="muted" id="preview-meta"></p></div>
+        <button class="btn btn-ghost btn-sm" id="preview-close">Close</button></div>
+      <pre id="preview-text"></pre>
+    </dialog>`;
 
   el("cmp-run").addEventListener("click", runCompare);
+  el("cmp-files").addEventListener("change", inspectTryAttachments);
+  el("preview-close").addEventListener("click", () => el("attachment-preview").close());
 
   el("cmp-eg1").addEventListener("click", () => {
     el("cmp-from").value = "docs@vitalsolutions.sg";
@@ -893,6 +922,66 @@ function renderTry() {
     el("cmp-body").value = "Click here now to unlock unlimited freight discounts!";
     el("cmp-msg").textContent = "No attachments needed — just press Process email.";
   });
+}
+
+async function inspectTryAttachments() {
+  const files = [...el("cmp-files").files];
+  const message = el("cmp-context-msg");
+  tryPreviews.clear();
+  el("cmp-carrier").value = "";
+  el("cmp-origin").value = "";
+  el("cmp-destination").value = "";
+  el("cmp-shipper").value = "";
+  el("cmp-consignee").value = "";
+  if (!files.length) {
+    message.textContent = "Carrier, route and parties will be extracted from the attachments.";
+    el("cmp-file-list").innerHTML = "";
+    return;
+  }
+
+  message.textContent = "Reading attachments and detecting shipment contextâ€¦";
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  try {
+    const response = await fetch("/api/inspect", { method: "POST", body: form });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Attachment inspection failed.");
+    const context = data.shipment_context || {};
+    const detected = data.detected_fields || {};
+    el("cmp-carrier").value = context.carrier || "";
+    el("cmp-origin").value = context.origin_country || "";
+    el("cmp-destination").value = context.destination_country || "";
+    el("cmp-shipper").value = detected.shipper || "";
+    el("cmp-consignee").value = detected.consignee || "";
+    for (const doc of data.documents || []) tryPreviews.set(doc.filename, doc);
+    const route = context.origin_country && context.destination_country
+      ? `${context.origin_country} â†’ ${context.destination_country}` : "";
+    const found = [context.carrier, route].filter(Boolean).join(" Â· ");
+    message.textContent = found ? `Detected from attachments: ${found}`
+      : "No carrier or route could be confidently extracted.";
+    el("cmp-file-list").innerHTML = files.map((file) => {
+      const doc = tryPreviews.get(file.name);
+      return `<div class="upload-row"><span class="mono">${esc(file.name)}</span>
+        <span class="muted">${doc ? esc((doc.detected_type || doc.format || "file").toUpperCase()) : ""}</span>
+        <button class="btn btn-ghost btn-sm preview-file" data-file="${esc(file.name)}"
+          ${doc ? "" : "disabled"}>Preview</button></div>`;
+    }).join("");
+    el("cmp-file-list").querySelectorAll(".preview-file").forEach((button) =>
+      button.addEventListener("click", () => openAttachmentPreview(button.dataset.file)));
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
+
+function openAttachmentPreview(filename) {
+  const doc = tryPreviews.get(filename);
+  if (!doc) return;
+  el("preview-name").textContent = filename;
+  el("preview-meta").textContent = [doc.format && doc.format.toUpperCase(),
+    doc.detected_type || "UNKNOWN", doc.preview_truncated ? "preview truncated" : ""]
+    .filter(Boolean).join(" Â· ");
+  el("preview-text").textContent = doc.preview || doc.error || "No extractable text found.";
+  el("attachment-preview").showModal();
 }
 
 async function runCompare() {
@@ -943,6 +1032,17 @@ function compareResult(d) {
       <span>${esc(roleName[doc.detected_type] || "not a shipping document")}</span></li>`).join("");
 
   const isComparison = d.category === "BL_COMPARISON";
+  const context = d.shipment_context || {};
+  const findings = d.compliance_findings || [];
+  const compliance = d.compliance_status || "NOT_CHECKED";
+  const complianceClass = compliance === "PASS" ? "OK"
+    : compliance === "BLOCK" ? "MISMATCH" : "info";
+  const complianceRows = findings.map((finding) => `
+    <div class="compliance-row ${finding.status === "PASS" ? "pass" : "block"}">
+      <div><strong>${esc(finding.status)}</strong> &middot; ${esc(FIELD_LABEL[finding.field] || finding.field)}</div>
+      <p>${esc(finding.message)}</p><p class="muted">${esc(finding.action)}</p>
+      <a href="${esc(finding.source_url)}" target="_blank" rel="noopener">Published requirement</a>
+    </div>`).join("");
   let banner;
   if (!isComparison && d.category) {
     banner = `<div class="banner info"><svg class="ico" viewBox="0 0 24 24"><use href="#i-mail"></use></svg>
@@ -972,6 +1072,16 @@ function compareResult(d) {
     ${roles ? `<span class="eyebrow" style="display:block;margin-top:18px">Documents read as</span>
       <ul class="roles">${roles}</ul>` : ""}
     ${(d.notes || []).length ? `<div class="notes">${d.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</div>` : ""}
+    ${isComparison ? `<div class="country-panel">
+      <span class="eyebrow">Country compliance</span>
+      <div class="banner ${complianceClass}" style="margin-top:8px">
+        <span><strong>${esc(compliance)}</strong>${context.carrier ? ` &middot; ${esc(context.carrier)}` : ""}
+        ${context.origin_country && context.destination_country
+          ? ` &middot; ${esc(context.origin_country)} &rarr; ${esc(context.destination_country)}` : ""}</span></div>
+      ${complianceRows || `<p class="note">${compliance === "NOT_APPLICABLE"
+        ? "No configured country rule applies to this route."
+        : "The carrier or route could not be extracted from the attachments."}</p>`}
+    </div>` : ""}
     ${verdictTable(d)}
     ${ladder(d)}`;
 }

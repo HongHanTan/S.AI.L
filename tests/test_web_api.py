@@ -194,6 +194,24 @@ def test_upload_compare_reports_a_clean_pair(client):
     assert r.json()["status"] == "OK"
 
 
+def test_inspect_endpoint_returns_context_and_preview(client):
+    c, _ = client
+    si = SI_DOC.replace(b"SHIPPING INSTRUCTION",
+                        b"SHIPPING INSTRUCTION\nShipping Line: Evergreen Marine")
+    si = si.replace(b"POD: KARACHI, PAKISTAN (PKKHI)",
+                    b"POD: JAKARTA, INDONESIA (IDJKT)")
+    r = c.post("/api/inspect", files=[
+        ("files", ("si.txt", si, "text/plain")),
+    ])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["shipment_context"]["carrier"] == "EVERGREEN"
+    assert body["shipment_context"]["destination_country"] == "ID"
+    assert body["detected_fields"]["shipper"].startswith("APRIL FAR EAST")
+    assert body["detected_fields"]["consignee"].startswith("EAST BRIGHT")
+    assert "SHIPPING INSTRUCTION" in body["documents"][0]["preview"]
+
+
 def test_upload_compare_rejects_a_single_file(client):
     c, _ = client
     r = c.post("/api/compare", files=[

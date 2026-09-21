@@ -2,6 +2,7 @@
 from sdoc.compare.ladder import compare_field
 from sdoc.compare.rollup import rollup
 from sdoc.config import Settings
+from sdoc.country_rules import evaluate_country_rules
 from sdoc.doctype import assign_roles
 from sdoc.docs.ingest import ingest
 from sdoc.extract.engine import extract_all_fields, snippet_for
@@ -9,6 +10,7 @@ from sdoc.gates import post_extraction_gate, pre_extraction_gate
 from sdoc.inbox import load_emails
 from sdoc.inbox import read_bytes as default_read_bytes
 from sdoc.models import FIELDS, EmailResult
+from sdoc.shipment_context import infer_shipment_context
 
 
 def process_email(
@@ -53,6 +55,13 @@ def process_email(
     if extract_fallback is not None:
         si_fields = extract_fallback(si_doc, si_fields)
         bl_fields = extract_fallback(bl_doc, bl_fields)
+
+    inferred = infer_shipment_context(docs, si_fields)
+    compliance = evaluate_country_rules(si_fields, inferred)
+    compliance["context"]["evidence"] = inferred["evidence"]
+    result.shipment_context = compliance["context"]
+    result.compliance_status = compliance["status"]
+    result.compliance_findings = compliance["findings"]
 
     if si_fields.get("_conflict") or bl_fields.get("_conflict"):
         result.status = "NEEDS_REVIEW"

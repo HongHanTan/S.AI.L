@@ -56,6 +56,9 @@ class EmailResult:
     defect_fields: list[str] = field(default_factory=list)
     verdicts: list[FieldVerdict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    shipment_context: dict = field(default_factory=dict)
+    compliance_status: str = "NOT_CHECKED"
+    compliance_findings: list[dict] = field(default_factory=list)
 
     def to_submission_entry(self) -> dict:
         return {
