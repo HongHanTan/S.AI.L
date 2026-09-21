@@ -367,16 +367,23 @@ function queueRows() {
    unrelated questions into one row and duplicated what the board already shows
    far better. Board mode answers it now, and this one filter drives both
    modes, so narrowing to Mismatch and switching view keeps the narrowing. */
-function filterBar() {
+/* Two presentations of one control. The board has room above five lanes for a
+   segmented group with lit status markers; the list view puts the same control
+   in a narrow column beside the detail pane, where the markers and the longer
+   wording push it onto a second row. Same keys, same handler, same state. */
+function filterBar(mode) {
   const s = state.stats || { comparison_statuses: {} };
+  const board = mode === "board";
   const options = [
-    ["ALL", "All", state.emails.length],
-    ["MISMATCH", "Mismatch", s.comparison_statuses.MISMATCH || 0],
-    ["NEEDS_REVIEW", "Needs review", s.comparison_statuses.NEEDS_REVIEW || 0],
-    ["OK", "Clean", s.comparison_statuses.OK || 0],
+    ["ALL", "All", state.emails.length, ""],
+    ["MISMATCH", board ? "Mismatch found" : "Mismatch", s.comparison_statuses.MISMATCH || 0, "bad"],
+    ["NEEDS_REVIEW", "Needs review", s.comparison_statuses.NEEDS_REVIEW || 0, "warn"],
+    ["OK", board ? "Cleared" : "Clean", s.comparison_statuses.OK || 0, "ok"],
   ];
-  return `<div class="filters">${options.map(([key, label, count]) => `
+  return `<div class="filters${board ? " segmented" : ""}">${options
+    .map(([key, label, count, tone]) => `
     <button class="filter" data-filter="${key}" aria-pressed="${state.filter === key}">
+      ${board && tone ? `<i class="fdot ${tone}" aria-hidden="true"></i>` : ""}
       ${esc(label)}<em class="num">${count}</em></button>`).join("")}</div>`;
 }
 
@@ -427,7 +434,7 @@ async function renderInbox() {
 
   const controls = `
     <div class="queue-controls">
-      <div style="flex:1;min-width:0">${filterBar()}</div>
+      <div style="flex:1;min-width:0">${filterBar(state.mode)}</div>
       ${modeToggle()}
     </div>`;
 
@@ -476,6 +483,11 @@ async function renderInbox() {
       if (next) { next.focus(); location.hash = `#/inbox/${next.dataset.id}`; }
     });
   });
+
+  // Arriving from the board can land on a row far down a 520-row queue, so the
+  // selection is brought into view rather than left for the reader to hunt.
+  const current = queue.querySelector('.queue-row[aria-current="true"]');
+  if (current) current.scrollIntoView({ block: "nearest" });
 
   if (state.selected) await renderDetail();
 }
@@ -1286,6 +1298,29 @@ function wireQueueControls(target) {
    src/sdoc/models.py, which is what submission.json is scored on, shown
    verbatim so a lane maps onto an evaluation key with no translation step. */
 
+/* Inlined rather than added to the sprite: the sprite lives in index.html and
+   this change is confined to the script and the stylesheet. Each is a filled
+   24x24 path in the same idiom as the sprite's own icons, and each takes its
+   colour from the lane's --cat, so the icon, the header rule and the count
+   badge are all one hue with no second place to keep it in step. */
+const LANE_ICONS = {
+  // Stacked sheets: one document checked against another.
+  BL_COMPARISON: "M12 2 2 7l10 5 10-5-10-5Zm7.8 7.3L12 13.2 4.2 9.3 2 10.4l10 5 "
+    + "10-5-2.2-1.1Zm0 4.5L12 17.7l-7.8-3.9L2 14.9l10 5 10-5-2.2-1.1Z",
+  // Into the tray: an instruction arriving or being asked for.
+  SI_REQUEST: "M11 3h2v6.2l2.3-2.3 1.4 1.4L12 13l-4.7-4.7 1.4-1.4L11 9.2V3Zm-7 11h5.2"
+    + "l1.2 2h3.2l1.2-2H20v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5Z",
+  // A receipt, torn edge and all.
+  INVOICE_QUERY: "M5 2h14v20l-2.3-1.5-2.3 1.5-2.4-1.5-2.3 1.5L7.3 20.5 5 22V2Zm2 4v2h10V6"
+    + "H7Zm0 4v2h10v-2H7Zm0 4v2h7v-2H7Z",
+  // Plain correspondence.
+  GENERAL: "M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm1 3.2V17"
+    + "h16V8.2l-8 5-8-5ZM19.4 7H4.6l7.4 4.6L19.4 7Z",
+  // Shield with a warning: caught, not delivered.
+  SPAM: "M12 2 4 5.5V11c0 4.6 3.4 8.6 8 9.8 4.6-1.2 8-5.2 8-9.8V5.5L12 2Zm-1 4.5h2v6h-2v-6Z"
+    + "m0 7.8h2v2h-2v-2Z",
+};
+
 const CATEGORY_LANES = [
   ["BL_COMPARISON",  "Draft checked against instruction"],
   ["SI_REQUEST",     "Shipping instruction sent or requested"],
@@ -1336,6 +1371,28 @@ function routeOf(subject) {
   return `${titleCase(m[1].trim())}, ${countryCase(m[2].trim())}`;
 }
 
+/** A subject field that is only the raw CITY_COUNTRY token. */
+const ROUTE_TOKEN = /^[A-Z]+(?: [A-Z]+){0,2}_[A-Z]+(?: [A-Z]+)?$/;
+
+/** The subject broken into its delimited fields, with the reply marker, the
+ *  booking reference and the raw port token dropped: all three have their own
+ *  place on the card now, and repeating them is what made the line unreadable.
+ *
+ *  Subjects separate fields with " _ " or " - ", so the split is on the spaced
+ *  delimiter, and on a trailing "_ " where the leading space was dropped. A
+ *  bare underscore is never one: it is what holds CALLAO_PERU together, and
+ *  what dates like 15_01_2026 are built from.
+ */
+function subjectParts(subject, ref) {
+  return String(subject || "")
+    .replace(/^\s*(?:re|fw|fwd)\s*[:_-]\s*/i, "")
+    .split(/\s+[_-]\s+|_\s+|_{2,}/)
+    .map((part) => part.replace(/^[\s_]+|[\s_]+$/g, ""))
+    .filter(Boolean)
+    .filter((part) => !(ref && part.includes(ref)))
+    .filter((part) => !ROUTE_TOKEN.test(part));
+}
+
 function seqNumber(emailId) {
   const m = String(emailId || "").match(/(\d+)/);
   return m ? m[1] : "";
@@ -1354,6 +1411,11 @@ function boardOutcome(rec) {
   return { cls: "ok", text: "All 7 fields match" };
 }
 
+/* Inlined rather than added to the sprite, because the sprite lives in
+   index.html and this change is confined to the script and the stylesheet. */
+const CLIP_PATH = "M7 8v8.5a5 5 0 0 0 10 0V6.5a3.5 3.5 0 1 0-7 0V16a2 2 0 1 0 "
+  + "4 0V8h-1.5v8a.5.5 0 0 1-1 0V6.5a2 2 0 1 1 4 0V16.5a3.5 3.5 0 1 1-7 0V8H7Z";
+
 /** One card. On the board a card opens a dialog rather than navigating: the
  *  lanes are a survey, and losing your place in them to read one verdict is a
  *  poor trade. */
@@ -1363,19 +1425,28 @@ function boardCard(rec) {
   const outcome = boardOutcome(rec);
   const count = rec.attachment_count;
 
+  // With a reference the top slot is that reference and the whole remaining
+  // subject reads below it. Without one - 194 of the 520, and the payload
+  // carries no sender to put there instead - the subject's own first field is
+  // promoted into the slot and the rest reads below, so the header is never
+  // empty and nothing is said twice.
+  const parts = subjectParts(rec.subject, ref);
+  const head = ref || parts[0] || "";
+  const body = (ref ? parts : parts.slice(1)).join(" \u00b7 ");
+
   return `<button type="button" class="bcard" data-open="${esc(rec.email_id)}"
              data-status="${esc(rec.status)}">
     <span class="bcard-top">
-      <span class="bcard-ref mono">${esc(ref || "—")}</span>
+      ${head ? `<span class="bcard-ref${ref ? " mono" : " text"}">${esc(head)}</span>` : ""}
       <span class="bcard-seq mono">#${esc(seqNumber(rec.email_id))}</span>
     </span>
     ${route ? `<span class="bcard-route">&rarr; ${esc(route)}</span>` : ""}
-    <span class="bcard-subject">${esc(rec.subject || "(no subject)")}</span>
+    ${body ? `<span class="bcard-subject">${esc(body)}</span>` : ""}
     ${outcome.text
       ? `<span class="bcard-outcome ${outcome.cls}">${esc(outcome.text)}</span>`
-      : `<span class="bcard-att">${count
-            ? `${count} attachment${count === 1 ? "" : "s"}`
-            : "No attachments"}</span>`}
+      : ""}
+    ${count ? `<span class="bcard-att"><svg class="clip" viewBox="0 0 24 24"
+         aria-hidden="true"><path d="${CLIP_PATH}"/></svg>${count}</span>` : ""}
   </button>`;
 }
 
@@ -1392,6 +1463,8 @@ function boardLanes(rows) {
       <header class="lane-h">
         <h2>
           <span class="lane-name">
+            <svg class="lane-i" viewBox="0 0 24 24" aria-hidden="true"
+              ><path d="${LANE_ICONS[key]}"/></svg>
             <span class="enum mono">${esc(key)}</span>
             ${key === "BL_COMPARISON" ? `<span class="lane-flag">primary desk</span>` : ""}
           </span>
@@ -1461,8 +1534,9 @@ async function openBoardDialog(emailId) {
     ${banner}
     ${verdictTable(d) || `<p class="note">No field comparison ran on this email.</p>`}
     <p class="dlg-foot">
-      <a class="act" href="#/inbox/${encodeURIComponent(d.email_id)}">Open in the queue</a>
-      <span class="faint">for the full decision trace</span>
+      <a class="act queue-link" href="#/inbox/${encodeURIComponent(d.email_id)}"
+         >Open in the queue <span aria-hidden="true">&rarr;</span></a>
+      <span class="dlg-note">for the full decision trace</span>
     </p>`;
 
   el("card-dialog-close").addEventListener("click", () => dlg.close());
