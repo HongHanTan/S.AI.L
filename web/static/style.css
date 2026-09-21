@@ -860,3 +860,11 @@ button.action:active, button:not([disabled]).btn:active, .tab:active, .chip-btn:
 /* Make it obvious the backdrop is a dismiss target. */
 .card-dialog::backdrop { cursor: pointer; }
 #card-dialog-body { cursor: default; }
+
+/* Chosen attachments accumulate across picks, so each row needs a way out. */
+.upload-row { display: flex; align-items: center; gap: 10px; }
+.upload-row .mono { flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.upload-row .remove-file { flex: none; font-size: 16px; line-height: 1;
+  padding: 2px 8px; color: var(--muted); }
+.upload-row .remove-file:hover { color: var(--bad); }
