@@ -134,7 +134,10 @@ button, input, textarea, select { font:inherit; color:inherit; }
 
 /* ----------------------------------------------------------------- cards */
 
-.card { background:var(--card); border-radius:var(--r-lg); box-shadow:var(--shadow); padding:22px; }
+.card {
+  background:var(--card); border-radius:var(--r-lg); box-shadow:var(--shadow);
+  padding:22px; min-width:0;   /* a grid/flex child defaults to min-content */
+}
 .card + .card { margin-top:18px; }
 .card-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:4px; }
 .card-head h2 { font-size:17px; }
@@ -330,11 +333,47 @@ mark {
 }
 .input:focus, .textarea:focus { border-color:var(--accent); background:var(--card); outline:none; }
 .textarea { resize:vertical; min-height:120px; line-height:1.6; font-family:var(--sans); }
-input[type=file] { font-size:12px; color:var(--muted); }
-input[type=file]::file-selector-button {
-  margin-right:10px; padding:8px 14px; border:0; border-radius:var(--r-pill);
-  background:var(--accent-soft); color:var(--accent); font-weight:600; cursor:pointer;
+/* The native input stays in the DOM because it is the only way to open a file
+   picker, but it is never shown: its own "3 files selected" summary would sit
+   next to the list below and contradict it after a removal. The list is the
+   state; the button beside it is the way in. */
+.file-input { display:none; }
+
+.file-pick { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-width:0; }
+.file-count { font-size:12px; min-width:0; }
+
+/* minmax(0,1fr), not the default auto: an auto track floors at the row's
+   min-content width, and a flex row containing nowrap text reports that text's
+   full width as min-content however hard the span itself can shrink. A long
+   filename therefore pushed the track - and the row - straight through the
+   side of the card. Clamping the track minimum to 0 hands the shrinking back
+   to the flex line inside, where the ellipsis lives. */
+.filelist {
+  list-style:none; margin:10px 0 0; padding:0;
+  display:grid; grid-template-columns:minmax(0,1fr); gap:6px;
 }
+.file-row {
+  display:flex; align-items:center; gap:10px; min-width:0; max-width:100%;
+  padding:8px 8px 8px 12px; border:1px solid var(--line-2);
+  border-radius:var(--r-md); background:var(--canvas);
+}
+.file-row .ico { font-size:15px; }
+.file-name {
+  flex:1; min-width:0; font-size:13px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.file-size { flex:0 0 auto; font-size:11px; color:var(--muted); white-space:nowrap; }
+
+/* --faint would be 1.74:1 here, under the 3:1 a control has to clear, so the
+   bin rests at --muted and turns red only under the pointer. */
+.file-del {
+  flex:0 0 auto; display:grid; place-items:center; width:30px; height:30px;
+  border:0; border-radius:var(--r-sm); background:transparent;
+  color:var(--muted); font-size:15px; cursor:pointer;
+  transition:background .15s ease, color .15s ease;
+}
+.file-del:hover { background:var(--bad-soft); color:var(--bad); }
+.file-del:focus-visible { color:var(--bad); }
 
 .btn {
   border:0; cursor:pointer; height:44px; padding:0 22px; border-radius:var(--r-pill);
@@ -347,11 +386,17 @@ input[type=file]::file-selector-button {
 .btn[disabled] { opacity:.55; cursor:default; }
 .btn-ghost { background:var(--canvas); color:var(--muted); }
 .btn-ghost:hover { background:var(--line); color:var(--ink); }
+.btn-danger:hover { background:var(--bad-soft); color:var(--bad); }
 .btn-sm { height:34px; padding:0 15px; font-size:12px; }
 .btn-ok  { background:var(--ok); }  .btn-ok:hover  { background:#0b8d5f; }
 .btn-bad { background:var(--bad); } .btn-bad:hover { background:#cc3a5b; }
 
-.btn-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:20px; }
+.btn-row {
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  margin-top:20px; min-width:0;
+}
+/* Pushed to the far end: it undoes the row rather than belonging to it. */
+.btn-reset { margin-left:auto; }
 
 /* ------------------------------------------------------------- review cards */
 

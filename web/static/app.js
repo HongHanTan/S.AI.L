@@ -821,6 +821,50 @@ async function renderReview() {
 
 /* ---------------------------------------------------------------- try view */
 
+/* An <input type=file> hands back a read-only FileList, so there is no way to
+   drop one entry from it. The picked files are kept here instead and the
+   upload is built from this array; the input is only ever a source of new
+   files, and is emptied after every pick. */
+let tryFiles = [];
+
+/** Bytes, at the precision a person reading a file list actually wants. */
+function fileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** What the result pane says before anything has been run, and what Clear
+ *  form puts back. Written once so the two cannot drift apart. */
+const TRY_PLACEHOLDER = () => emptyState("i-play", "No result yet",
+  "Fill in the form and press Process email. The result appears here.");
+
+/** Clear form is live only when there is something to clear, so the control
+ *  reports the state of the form before anyone presses it. */
+function syncClear() {
+  const typed = ["cmp-from", "cmp-subject", "cmp-body"].some((id) => el(id).value !== "");
+  const ran = !el("cmp-out").querySelector(".empty");
+  el("cmp-clear").disabled = !(typed || tryFiles.length > 0 || ran);
+}
+
+function renderTryFiles() {
+  el("cmp-filelist").innerHTML = tryFiles.map((file, i) => `
+    <li class="file-row">
+      <svg class="ico faint" viewBox="0 0 24 24"><use href="#i-files"></use></svg>
+      <span class="file-name">${esc(file.name)}</span>
+      <span class="file-size mono num">${fileSize(file.size)}</span>
+      <button class="file-del" type="button" data-i="${i}"
+              title="Remove ${esc(file.name)}" aria-label="Remove ${esc(file.name)}">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
+      </button>
+    </li>`).join("");
+
+  el("cmp-count").textContent = tryFiles.length
+    ? `${tryFiles.length} file${tryFiles.length === 1 ? "" : "s"} attached`
+    : "";
+  syncClear();
+}
+
 function renderTry() {
   const target = el("view-try");
   if (target.dataset.ready) return;
@@ -856,24 +900,76 @@ function renderTry() {
         </div>
         <div class="field-group">
           <label for="cmp-files">Attachments &mdash; optional, any order</label>
-          <input type="file" id="cmp-files" multiple>
+          <input type="file" id="cmp-files" class="file-input" multiple>
+          <div class="file-pick">
+            <button class="btn btn-ghost btn-sm" type="button" id="cmp-pick">
+              <svg class="ico" viewBox="0 0 24 24"><use href="#i-files"></use></svg>
+              Choose files</button>
+            <span class="muted file-count" id="cmp-count" aria-live="polite"></span>
+          </div>
+          <ul class="filelist" id="cmp-filelist"></ul>
         </div>
 
         <div class="btn-row">
           <button class="btn" id="cmp-run"><svg class="ico" viewBox="0 0 24 24"><use href="#i-play"></use></svg> Process email</button>
           <button class="btn btn-ghost btn-sm" id="cmp-eg1">Load a document check</button>
           <button class="btn btn-ghost btn-sm" id="cmp-eg2">Load a spam example</button>
+          <button class="btn btn-ghost btn-sm btn-danger btn-reset" type="button"
+                  id="cmp-clear" disabled>
+            <svg class="ico" viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
+            Clear form</button>
         </div>
         <p class="muted" id="cmp-msg" style="font-size:12px;margin:10px 0 0"></p>
       </div>
 
-      <div class="card" id="cmp-out">
-        ${emptyState("i-play", "No result yet",
-          "Fill in the form and press Process email. The result appears here.")}
-      </div>
+      <div class="card" id="cmp-out">${TRY_PLACEHOLDER()}</div>
     </div>`;
 
   el("cmp-run").addEventListener("click", runCompare);
+  el("cmp-pick").addEventListener("click", () => el("cmp-files").click());
+
+  el("cmp-files").addEventListener("change", () => {
+    const input = el("cmp-files");
+    for (const file of input.files) {
+      // The same name at the same size twice over is a double-pick, not two
+      // documents, so it is dropped rather than uploaded twice.
+      if (!tryFiles.some((f) => f.name === file.name && f.size === file.size)) {
+        tryFiles.push(file);
+      }
+    }
+    input.value = "";   // so picking the same file again still fires change
+    renderTryFiles();
+  });
+
+  el("cmp-clear").addEventListener("click", () => {
+    for (const id of ["cmp-from", "cmp-subject", "cmp-body"]) el(id).value = "";
+    tryFiles = [];
+    el("cmp-files").value = "";
+    renderTryFiles();
+    el("cmp-msg").textContent = "";
+    el("cmp-out").innerHTML = TRY_PLACEHOLDER();
+    syncClear();
+    el("cmp-from").focus();
+  });
+
+  for (const id of ["cmp-from", "cmp-subject", "cmp-body"]) {
+    el(id).addEventListener("input", syncClear);
+  }
+
+  el("cmp-filelist").addEventListener("click", (event) => {
+    const button = event.target.closest(".file-del");
+    if (!button) return;
+    const index = Number(button.dataset.i);
+    tryFiles.splice(index, 1);
+    renderTryFiles();
+    // That button no longer exists, so focus is handed to the row that moved
+    // into its place, or back to the picker once the list is empty.
+    const rest = el("cmp-filelist").querySelectorAll(".file-del");
+    (rest[Math.min(index, rest.length - 1)] || el("cmp-pick")).focus();
+  });
+
+  renderTryFiles();
+  syncClear();
 
   el("cmp-eg1").addEventListener("click", () => {
     el("cmp-from").value = "docs@vitalsolutions.sg";
@@ -885,6 +981,7 @@ function renderTry() {
       "Best Regards,", "Deswita",
     ].join("\n");
     el("cmp-msg").textContent = "Now attach an SI and a BL, then press Process email.";
+    syncClear();
   });
 
   el("cmp-eg2").addEventListener("click", () => {
@@ -892,6 +989,7 @@ function renderTry() {
     el("cmp-subject").value = "Increase your shipping revenue with this ONE weird trick";
     el("cmp-body").value = "Click here now to unlock unlimited freight discounts!";
     el("cmp-msg").textContent = "No attachments needed — just press Process email.";
+    syncClear();
   });
 }
 
@@ -915,7 +1013,7 @@ async function runCompare() {
   form.append("subject", subject);
   form.append("body", body);
   form.append("sender", el("cmp-from").value);
-  for (const file of el("cmp-files").files) form.append("files", file);
+  for (const file of tryFiles) form.append("files", file);
 
   try {
     const response = await fetch("/api/try-email", { method: "POST", body: form });
@@ -932,6 +1030,7 @@ async function runCompare() {
   } finally {
     button.disabled = false;
     message.textContent = "";
+    syncClear();
   }
 }
 
