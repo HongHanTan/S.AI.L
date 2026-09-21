@@ -17,17 +17,45 @@ from dataclasses import asdict
 
 from sdoc.compare.ladder import compare_field
 from sdoc.compare.rollup import rollup
+from sdoc.country_rules import evaluate_country_rules
 from sdoc.doctype import assign_roles, detect_doc_type
 from sdoc.docs.ingest import ingest
 from sdoc.extract.engine import extract_all_fields, snippet_for
 from sdoc.gates import post_extraction_gate
 from sdoc.models import FIELDS
+from sdoc.shipment_context import infer_shipment_context
 
 MAX_BYTES = 10 * 1024 * 1024  # 10 MB per file is far above any real SI or BL
 
 
 class UploadError(ValueError):
     """A problem with what was uploaded, not with the documents' contents."""
+
+
+def inspect_uploads(files: list[tuple[str, bytes]]) -> dict:
+    """Extract previews and shipment context as soon as files are selected."""
+    docs = []
+    for name, raw in files:
+        if not raw:
+            raise UploadError(f"{name} is empty.")
+        if len(raw) > MAX_BYTES:
+            raise UploadError(f"{name} is larger than {MAX_BYTES // (1024 * 1024)} MB.")
+        docs.append(ingest(name, raw))
+    si_doc, _ = assign_roles(docs)
+    reference = si_doc or next((doc for doc in docs if not doc.error), None)
+    fields = extract_all_fields(reference) if reference is not None else {}
+    return {
+        "shipment_context": infer_shipment_context(docs, fields),
+        "detected_fields": {
+            "shipper": fields.get("shipper"),
+            "consignee": fields.get("consignee"),
+        },
+        "documents": [{
+            "filename": doc.path, "format": doc.fmt,
+            "detected_type": detect_doc_type(doc), "error": doc.error,
+            "preview": doc.text[:20000], "preview_truncated": len(doc.text) > 20000,
+        } for doc in docs],
+    }
 
 
 def compare_uploads(files: list[tuple[str, bytes]]) -> dict:
@@ -64,6 +92,9 @@ def compare_uploads(files: list[tuple[str, bytes]]) -> dict:
         "defect_fields": [],
         "verdicts": [],
         "notes": [],
+        "shipment_context": {},
+        "compliance_status": "NOT_CHECKED",
+        "compliance_findings": [],
     }
 
     unreadable = [d for d in docs if d.error]
@@ -90,6 +121,13 @@ def compare_uploads(files: list[tuple[str, bytes]]) -> dict:
     bl_fields = extract_all_fields(bl_doc)
     result["si_filename"] = si_doc.path
     result["bl_filename"] = bl_doc.path
+
+    inferred = infer_shipment_context(docs, si_fields)
+    compliance = evaluate_country_rules(si_fields, inferred)
+    compliance["context"]["evidence"] = inferred["evidence"]
+    result["shipment_context"] = compliance["context"]
+    result["compliance_status"] = compliance["status"]
+    result["compliance_findings"] = compliance["findings"]
 
     if si_fields.get("_conflict") or bl_fields.get("_conflict"):
         result["review_reason"] = "missing_value"
@@ -202,6 +240,9 @@ def process_typed_email(
         "defect_fields": outcome.defect_fields,
         "verdicts": [asdict(v) for v in outcome.verdicts],
         "notes": outcome.notes,
+        "shipment_context": outcome.shipment_context,
+        "compliance_status": outcome.compliance_status,
+        "compliance_findings": outcome.compliance_findings,
         "documents": [
             {
                 "filename": d.path,

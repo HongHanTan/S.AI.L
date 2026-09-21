@@ -1,0 +1,14 @@
+BILL OF LADING (DRAFT)
+========================================
+Vessel Operator: New Ocean Logistics
+
+Shipper: VITAL SOLUTIONS SDN BHD
+  KUALA LUMPUR, MALAYSIA
+Consignee: PT NUSANTARA LOGISTICS INDONESIA
+  JL. TANJUNG PRIOK, JAKARTA, INDONESIA
+  NPWP 0123456789012345
+Notify Party: SAME AS CONSIGNEE
+Port of Loading: PORT KLANG, MALAYSIA (MYPKG)
+Port of Discharge: JAKARTA, INDONESIA (IDJKT)
+Total Containers: 2 x 40'HC
+Gross Weight (KG): 42,000 KG

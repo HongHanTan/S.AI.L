@@ -43,7 +43,7 @@ _VARIANTS: dict[str, list[str]] = {
 # swallows the vessel name that follows it. Address fragments ("P.O. BOX",
 # "TEL") are deliberately excluded: those appear *inside* party values.
 NON_FIELD_LABELS: frozenset[str] = frozenset({
-    "B L NO", "B L NUMBER", "BILL OF LADING", "BILL OF LADING NO",
+    "B L NO", "B L NUMBER", "BILL OF LADING", "BILL OF LADING NO", "CARRIER",
     "BL INSTRUCTION", "BL NO", "BOOKING NO", "BOOKING REF",
     "BOOKING REFERENCE", "BUYER", "CERTIFICATE NO", "COMMODITY",
     "CONTAINER NO", "COUNTRY OF ORIGIN", "DESCRIPTION",

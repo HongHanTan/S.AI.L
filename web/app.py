@@ -3,22 +3,42 @@ ad-hoc comparison endpoint for documents uploaded in the browser."""
 import json
 import os
 import re
+import sys
 from pathlib import Path, PurePosixPath
+
+WEB_DIR = Path(__file__).resolve().parent
+ROOT = WEB_DIR.parent
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
+
+
+def _load_local_env() -> None:
+    """Load the Gemini key from the git-ignored root .env for local demos."""
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() == "GEMINI_API_KEY":
+            os.environ.setdefault("GEMINI_API_KEY", value.strip().strip('"').strip("'"))
+
+
+_load_local_env()
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from sdoc.adhoc import UploadError, compare_uploads, process_typed_email
+from sdoc.adhoc import UploadError, compare_uploads, inspect_uploads, process_typed_email
 from sdoc.compare.alias import AliasStore
 from sdoc.compare.similarity import DIFFERENT_AT, SAME_AT, band
 from sdoc.firestore_store import FirestoreAliasStore
 from sdoc.models import FIELDS
 from sdoc.results import load_run
-
-WEB_DIR = Path(__file__).parent
-ROOT = WEB_DIR.parent
 
 # An email_id is only ever a run.json key, but it arrives from the URL, so it
 # is validated before it is ever joined onto a filesystem path.
@@ -186,6 +206,15 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None,
         try:
             payload = [(f.filename or "document", await f.read()) for f in files]
             return process_typed_email(subject, body, sender, payload)
+        except UploadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/inspect")
+    async def inspect_documents(files: list[UploadFile] = File(...)):  # noqa: B008
+        """Return extracted previews and carrier/route inference."""
+        try:
+            payload = [(f.filename or "document", await f.read()) for f in files]
+            return inspect_uploads(payload)
         except UploadError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

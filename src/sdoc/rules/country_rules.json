@@ -1,0 +1,54 @@
+[
+  {
+    "rule_id": "id-import-party-v1",
+    "title": "Indonesia import party requirements",
+    "carrier": "*",
+    "direction": "IMPORT",
+    "country": "ID",
+    "effective_from": "2021-08-01",
+    "source_url": "https://www.maersk.com/local-information/asia-pacific/indonesia/import",
+    "source_checked": "2026-09-21",
+    "requirements": [
+      {
+        "type": "party_local",
+        "field": "consignee",
+        "severity": "BLOCK",
+        "message": "A local Indonesian consignee is mandatory for Indonesia imports.",
+        "action": "Reject the SI and request a local Indonesian consignee before submission."
+      },
+      {
+        "type": "tax_id_present",
+        "field": "consignee",
+        "severity": "BLOCK",
+        "message": "The consignee Tax ID / NPWP is mandatory.",
+        "action": "Add the consignee Tax ID / NPWP to the Shipping Instruction."
+      }
+    ]
+  },
+  {
+    "rule_id": "id-export-party-v1",
+    "title": "Indonesia export party requirements",
+    "carrier": "*",
+    "direction": "EXPORT",
+    "country": "ID",
+    "effective_from": "2021-08-01",
+    "source_url": "https://www.maersk.com/~/media_sc9/maersk/local-information/files/asia-pacific/indonesia/export/export-advisory/shipping-instruction-mandatory.pdf",
+    "source_checked": "2026-09-21",
+    "requirements": [
+      {
+        "type": "party_local",
+        "field": "shipper",
+        "severity": "BLOCK",
+        "message": "A local Indonesian shipper is required for Indonesia exports.",
+        "action": "Add a local Indonesian shipper or confirm an applicable exception."
+      },
+      {
+        "type": "tax_id_present",
+        "field": "shipper",
+        "severity": "BLOCK",
+        "message": "The local shipper Tax ID is required.",
+        "action": "Add the shipper Tax ID to the Shipping Instruction."
+      }
+    ]
+  }
+]

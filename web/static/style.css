@@ -324,6 +324,10 @@ mark {
 
 .field-group { margin-top:16px; }
 .field-group label { display:block; font-size:12px; font-weight:600; margin-bottom:6px; }
+.context-grid { display:grid; grid-template-columns:1.35fr .8fr .8fr; gap:10px; }
+.party-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.auto-input[readonly] { color:var(--ink); background:var(--canvas); cursor:default; }
+.party-input { min-height:72px; font-family:var(--mono); font-size:11px; }
 .input, .textarea {
   width:100%; padding:11px 14px; border:1px solid var(--line-2);
   border-radius:var(--r-md); background:var(--canvas); font-size:13px;
@@ -334,6 +338,37 @@ input[type=file] { font-size:12px; color:var(--muted); }
 input[type=file]::file-selector-button {
   margin-right:10px; padding:8px 14px; border:0; border-radius:var(--r-pill);
   background:var(--accent-soft); color:var(--accent); font-weight:600; cursor:pointer;
+}
+.upload-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+.upload-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center; gap:10px; padding:7px 8px 7px 11px;
+  border:1px solid var(--line); border-radius:var(--radius); background:var(--canvas); }
+.upload-row > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.attachment-dialog { width:min(840px,calc(100vw - 32px)); padding:0;
+  color:var(--ink); background:var(--card); border:1px solid var(--line);
+  border-radius:10px; box-shadow:0 20px 70px rgba(27,29,42,.28); }
+.attachment-dialog::backdrop { background:rgba(27,29,42,.45); backdrop-filter:blur(2px); }
+.attachment-dialog-head { display:flex; align-items:flex-start; justify-content:space-between;
+  gap:16px; padding:16px 18px; border-bottom:1px solid var(--line); }
+.attachment-dialog-head h2 { margin:0 0 4px; font-size:16px; }
+.attachment-dialog-head p { margin:0; }
+.attachment-dialog pre { margin:0; padding:18px; max-height:70vh; overflow:auto;
+  white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.6 var(--mono); }
+.country-panel { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.compliance-row { margin-top:8px; padding:11px 12px; border:1px solid var(--line);
+  border-left-width:3px; border-radius:var(--radius); background:var(--canvas); font-size:12px; }
+.compliance-row.pass { border-left-color:var(--ok); }
+.compliance-row.block { border-left-color:var(--bad); }
+.compliance-row.block strong { color:var(--bad); }
+.compliance-row.pass strong { color:var(--ok); }
+.compliance-row p { margin:5px 0 0; }
+.compliance-row a { display:inline-block; margin-top:7px; color:var(--accent); }
+
+@media (max-width:560px) {
+  .context-grid { grid-template-columns:1fr; }
+  .party-grid { grid-template-columns:1fr; }
+  .upload-row { grid-template-columns:minmax(0,1fr) auto; }
+  .upload-row .muted { display:none; }
 }
 
 .btn {
@@ -642,3 +677,11 @@ button.action:active, button:not([disabled]).btn:active, .tab:active, .chip-btn:
 /* Make it obvious the backdrop is a dismiss target. */
 .card-dialog::backdrop { cursor: pointer; }
 #card-dialog-body { cursor: default; }
+
+/* Chosen attachments accumulate across picks, so each row needs a way out. */
+.upload-row { display: flex; align-items: center; gap: 10px; }
+.upload-row .mono { flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.upload-row .remove-file { flex: none; font-size: 16px; line-height: 1;
+  padding: 2px 8px; color: var(--muted); }
+.upload-row .remove-file:hover { color: var(--bad); }
