@@ -51,10 +51,6 @@
         <svg class="ico" viewBox="0 0 24 24"><use href="#i-inbox"></use></svg><span>Inbox</span>
         <em class="count" id="count-inbox"></em>
       </a>
-      <a class="nav-item" href="#/board" data-view="board">
-        <svg class="ico" viewBox="0 0 24 24"><use href="#i-board"></use></svg><span>Category board</span>
-        <em class="count" id="count-board"></em>
-      </a>
       <a class="nav-item" href="#/review" data-view="review">
         <svg class="ico" viewBox="0 0 24 24"><use href="#i-review"></use></svg><span>Review queue</span>
         <em class="count count-warn" id="count-review"></em>
@@ -89,7 +85,6 @@
     <main class="views">
       <section id="view-overview" class="view" tabindex="-1"></section>
       <section id="view-inbox"    class="view" tabindex="-1" hidden></section>
-      <section id="view-board"    class="view" tabindex="-1" hidden></section>
       <section id="view-review"   class="view" tabindex="-1" hidden></section>
       <section id="view-try"      class="view" tabindex="-1" hidden></section>
     </main>
@@ -97,6 +92,11 @@
 </div>
 
 <div class="rail-scrim" id="rail-scrim" hidden></div>
+
+<!-- Board cards open here. <dialog> gives focus trapping and Escape for free. -->
+<dialog class="card-dialog" id="card-dialog">
+  <div id="card-dialog-body"></div>
+</dialog>
 
 <script src="/static/app.js"></script>
 </body>

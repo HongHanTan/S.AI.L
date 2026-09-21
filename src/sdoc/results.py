@@ -8,6 +8,7 @@ def save_run(results, emails_by_id: dict, path: str = "run.json") -> None:
     payload = {}
     for r in results:
         email = emails_by_id.get(r.email_id, {})
+        attachments = email.get("attachments") or []
         payload[r.email_id] = {
             "subject": email.get("subject", ""),
             "from": email.get("from", ""),
@@ -15,7 +16,13 @@ def save_run(results, emails_by_id: dict, path: str = "run.json") -> None:
             "status": r.status,
             "review_reason": r.review_reason,
             "defect_fields": r.defect_fields,
-            "attachment_count": len(email.get("attachments") or []),
+            "attachment_count": len(attachments),
+            # The message as it arrived, so a reader can check a verdict
+            # against the input. Carried here rather than read from the inbox
+            # at request time: the deployment ships run.json and nothing else,
+            # and this is the only place both are already in hand.
+            "body": email.get("body", ""),
+            "attachment_names": [str(a).rsplit("/", 1)[-1] for a in attachments],
             "verdicts": [asdict(v) for v in r.verdicts],
             "notes": r.notes,
         }

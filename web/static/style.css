@@ -578,3 +578,67 @@ button.action:active, button:not([disabled]).btn:active, .tab:active, .chip-btn:
   padding: 4px 10px; border: 1px solid var(--line-2); border-radius: var(--r-pill);
   font: 500 11px var(--mono); color: var(--muted); background: var(--canvas); }
 .file-chip .ico { width: 13px; height: 13px; color: var(--faint); }
+
+/* ------------------------------------------------ queue controls
+   The filter and the layout switch sit on one row. List and board are two
+   presentations of the same queue, so the switch lives here rather than in
+   the sidebar, where it read as a second destination for the same data. */
+
+.queue-controls { display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap; margin: 14px 0 12px; }
+
+.mode-toggle { display: inline-flex; flex: none; gap: 2px; padding: 2px;
+  border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  background: var(--canvas); }
+.mode { display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--muted);
+  font: 600 12px var(--sans); cursor: pointer; }
+.mode .ico { width: 14px; height: 14px; }
+.mode[aria-pressed="true"] { background: var(--card); color: var(--ink);
+  box-shadow: var(--shadow); }
+
+.lane-count .of { color: var(--faint); font-weight: 500; }
+
+/* In board mode the lanes sit inside the queue card, so they need no shadow
+   of their own and should breathe a little more. */
+.card > .board { margin-top: 4px; }
+.card > .board .lane { box-shadow: none; }
+
+/* ------------------------------------------------------------- card dialog
+   A board card opens its verdict over the lanes rather than navigating away,
+   so the reader keeps their place in the survey. */
+
+.card-dialog { width: min(920px, calc(100vw - 32px)); padding: 0; border: 0;
+  border-radius: var(--r-lg); background: var(--card); color: var(--ink);
+  box-shadow: var(--shadow-lg); }
+.card-dialog::backdrop { background: rgba(27,29,42,.45); backdrop-filter: blur(2px); }
+.card-dialog[open] { animation: dlg-in .18s cubic-bezier(.2,.7,.3,1); }
+@keyframes dlg-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+#card-dialog-body { padding: 20px 22px 18px; max-height: 82vh; overflow-y: auto; }
+
+.dlg-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.dlg-head h2 { margin: 6px 0 2px; font: 600 17px/1.3 var(--disp); }
+.dlg-ids { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dlg-ids code { font-size: 12px; font-weight: 600; color: var(--muted); }
+.dlg-head .icon-btn { margin-left: auto; flex: none; font-size: 20px; line-height: 1; }
+
+.dlg-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: 12px; }
+.dlg-foot .act { text-decoration: none; }
+
+@media (prefers-reduced-motion: reduce) { .card-dialog[open] { animation: none; } }
+
+/* The verdict table has five columns and two of them hold addresses, so it
+   gets its own scroller inside the dialog rather than forcing the whole
+   panel wide enough for the worst case. */
+#card-dialog-body .table-wrap { overflow-x: auto; }
+#card-dialog-body table { min-width: 620px; }
+
+/* Make it obvious the backdrop is a dismiss target. */
+.card-dialog::backdrop { cursor: pointer; }
+#card-dialog-body { cursor: default; }

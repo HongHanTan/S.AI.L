@@ -12,6 +12,7 @@ const state = {
   details: {},      // email_id -> /api/emails/{id}, cached
   selected: null,
   tab: "report",    // "report" | "evidence"
+  mode: "list",     // "list" | "board" - two views of the same queue
   filter: "ALL",
   query: "",
 };
@@ -117,11 +118,17 @@ function parseHash() {
   return { view, id: parts[1] || null, tab: parts[2] === "evidence" ? "evidence" : "report" };
 }
 
-const TITLES = { overview: "Overview", inbox: "Inbox", board: "Category board",
+const TITLES = { overview: "Overview", inbox: "Inbox",
                  review: "Review queue", try: "Try an email" };
 
 async function route() {
-  const { view, id, tab } = parseHash();
+  let { view, id, tab } = parseHash();
+  // #/board is kept as a link target, but it is the Inbox in board mode -
+  // not a second destination for the same queue.
+  if (view === "board") { state.mode = "board"; view = "inbox"; id = null; }
+  // A link to one email means the list, which is the only mode with a detail
+  // pane. Without this, #/inbox/<id> silently renders the lanes instead.
+  if (view === "inbox" && id) state.mode = "list";
   state.selected = id;
   state.tab = tab;
 
@@ -139,7 +146,6 @@ async function route() {
 
   if (view === "overview") await renderOverview();
   if (view === "inbox")    await renderInbox();
-  if (view === "board")    await renderBoard();
   if (view === "review")   await renderReview();
   if (view === "try")      renderTry();
 }
@@ -339,10 +345,9 @@ async function renderOverview() {
 
 function matchesFilter(rec) {
   if (state.filter === "ALL") return true;
-  if (["OK", "MISMATCH", "NEEDS_REVIEW"].includes(state.filter)) {
-    return rec.category === "BL_COMPARISON" && rec.status === state.filter;
-  }
-  return rec.category === state.filter;
+  // Only comparison mail carries a meaningful status: everything else is
+  // "OK" merely because nothing was checked.
+  return rec.category === "BL_COMPARISON" && rec.status === state.filter;
 }
 
 function matchesQuery(rec) {
@@ -357,21 +362,34 @@ function queueRows() {
   return state.emails.filter((rec) => matchesFilter(rec) && matchesQuery(rec));
 }
 
+/* The filter answers "what needs my attention" only. The category axis — what
+   kind of mail this is — used to sit here as four more chips, which mixed two
+   unrelated questions into one row and duplicated what the board already shows
+   far better. Board mode answers it now, and this one filter drives both
+   modes, so narrowing to Mismatch and switching view keeps the narrowing. */
 function filterBar() {
-  const s = state.stats || { categories: {}, comparison_statuses: {} };
+  const s = state.stats || { comparison_statuses: {} };
   const options = [
     ["ALL", "All", state.emails.length],
     ["MISMATCH", "Mismatch", s.comparison_statuses.MISMATCH || 0],
     ["NEEDS_REVIEW", "Needs review", s.comparison_statuses.NEEDS_REVIEW || 0],
     ["OK", "Clean", s.comparison_statuses.OK || 0],
-    ["SI_REQUEST", "SI_REQUEST", s.categories.SI_REQUEST || 0],
-    ["INVOICE_QUERY", "INVOICE_QUERY", s.categories.INVOICE_QUERY || 0],
-    ["GENERAL", "GENERAL", s.categories.GENERAL || 0],
-    ["SPAM", "SPAM", s.categories.SPAM || 0],
   ];
   return `<div class="filters">${options.map(([key, label, count]) => `
     <button class="filter" data-filter="${key}" aria-pressed="${state.filter === key}">
       ${esc(label)}<em class="num">${count}</em></button>`).join("")}</div>`;
+}
+
+/* List or board: two presentations of one queue, so this is a control on the
+   page rather than a second destination in the sidebar. */
+function modeToggle() {
+  const modes = [["list", "List", "i-inbox"], ["board", "Board", "i-board"]];
+  return `<div class="mode-toggle" role="group" aria-label="Queue layout">
+    ${modes.map(([key, label, icon]) => `
+      <button class="mode" data-mode="${key}" aria-pressed="${state.mode === key}">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#${icon}"></use></svg>${label}
+      </button>`).join("")}
+  </div>`;
 }
 
 async function renderInbox() {
@@ -407,13 +425,34 @@ async function renderInbox() {
     : emptyState("i-search", "Nothing matches",
         "No email matches this filter and search. Try clearing the search box.");
 
+  const controls = `
+    <div class="queue-controls">
+      <div style="flex:1;min-width:0">${filterBar()}</div>
+      ${modeToggle()}
+    </div>`;
+
+  if (state.mode === "board") {
+    target.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div><h2>Queue by category</h2>
+            <p>${rows.length} of ${state.emails.length} emails, grouped by what the
+            classifier decided each one is</p></div>
+        </div>
+        ${controls}
+        ${boardLanes(rows)}
+      </div>`;
+    wireQueueControls(target);
+    return;
+  }
+
   target.innerHTML = `
     <div class="grid split">
       <div class="card" id="pane-queue">
         <div class="card-head">
           <div><h2>Queue</h2><p>${rows.length} of ${state.emails.length} emails</p></div>
         </div>
-        <div style="margin:14px 0 12px">${filterBar()}</div>
+        ${controls}
         <div class="queue" id="queue" role="list">${list}</div>
       </div>
       <div class="card" id="pane-detail">
@@ -423,11 +462,7 @@ async function renderInbox() {
       </div>
     </div>`;
 
-  target.querySelectorAll(".filter").forEach((button) =>
-    button.addEventListener("click", () => {
-      state.filter = button.dataset.filter;
-      renderInbox();
-    }));
+  wireQueueControls(target);
 
   const queue = el("queue");
   queue.querySelectorAll(".queue-row").forEach((row) => {
@@ -976,6 +1011,24 @@ window.addEventListener("hashchange", route);
 })();
 
 
+/** Filter chips and the list/board toggle behave the same in both modes. */
+function wireQueueControls(target) {
+  target.querySelectorAll(".filter").forEach((button) =>
+    button.addEventListener("click", () => {
+      state.filter = button.dataset.filter;
+      renderInbox();
+    }));
+  target.querySelectorAll(".bcard").forEach((card) =>
+    card.addEventListener("click", () => openBoardDialog(card.dataset.open)));
+  target.querySelectorAll(".mode").forEach((button) =>
+    button.addEventListener("click", () => {
+      state.mode = button.dataset.mode;
+      // Leaving a selection open would hide behind the board.
+      if (state.mode === "board" && state.selected) location.hash = "#/inbox";
+      else renderInbox();
+    }));
+}
+
 /* ------------------------------------------------------------------- board */
 /* Category board.
    Ported from yikkai's `ui-redesign` branch onto this dashboard's rendering
@@ -1003,27 +1056,18 @@ const FIELD_LABEL = {
   container_count: "Container count", gross_weight_kg: "Gross weight",
 };
 
-const BOARD_FILTERS = [
-  ["ALL", "All"],
-  ["MISMATCH", "Mismatch found"],
-  ["NEEDS_REVIEW", "Needs review"],
-  ["OK", "Cleared"],
-];
-
-const boardState = { filter: "ALL" };
-
 /** "5RSG-00133" style booking reference, if the subject carries one. */
 function bookingRef(subject) {
-  const m = String(subject || "").match(/\b\d[A-Z]{3}-\d{5}\b/);
+  const m = String(subject || "").match(/\d[A-Z]{3}-\d{5}/);
   return m ? m[0] : "";
 }
 
-/** "→ Callao, Peru" — the route, when the subject names a destination. */
+/** "Callao, Peru" - the route, when the subject names a destination. */
 function routeOf(subject) {
-  const m = String(subject || "").match(/\b([A-Z][A-Za-z ]+)_([A-Z][A-Za-z]+)\b/);
+  const m = String(subject || "").match(/([A-Z][A-Za-z ]+)_([A-Z][A-Za-z]+)/);
   if (!m) return "";
-  const city = m[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
-  const country = m[2].replace(/\b\w/g, (c) => c.toUpperCase());
+  const city = m[1].trim().replace(/\w/g, (c) => c.toUpperCase());
+  const country = m[2].replace(/\w/g, (c) => c.toUpperCase());
   return `${city}, ${country}`;
 }
 
@@ -1045,13 +1089,16 @@ function boardOutcome(rec) {
   return { cls: "ok", text: "All 7 fields match" };
 }
 
+/** One card. On the board a card opens a dialog rather than navigating: the
+ *  lanes are a survey, and losing your place in them to read one verdict is a
+ *  poor trade. */
 function boardCard(rec) {
   const ref = bookingRef(rec.subject);
   const route = routeOf(rec.subject);
   const outcome = boardOutcome(rec);
-  const hasAttachments = rec.attachment_count > 0;
+  const count = rec.attachment_count;
 
-  return `<a class="bcard" href="#/inbox/${encodeURIComponent(rec.email_id)}"
+  return `<button type="button" class="bcard" data-open="${esc(rec.email_id)}"
              data-status="${esc(rec.status)}">
     <span class="bcard-top">
       <span class="bcard-ref mono">${esc(ref || "—")}</span>
@@ -1061,42 +1108,21 @@ function boardCard(rec) {
     <span class="bcard-subject">${esc(rec.subject || "(no subject)")}</span>
     ${outcome.text
       ? `<span class="bcard-outcome ${outcome.cls}">${esc(outcome.text)}</span>`
-      : `<span class="bcard-att">${hasAttachments
-            ? `${rec.attachment_count} attachment${rec.attachment_count === 1 ? "" : "s"}`
+      : `<span class="bcard-att">${count
+            ? `${count} attachment${count === 1 ? "" : "s"}`
             : "No attachments"}</span>`}
-  </a>`;
+  </button>`;
 }
 
-async function renderBoard() {
-  const host = el("view-board");
-  if (!state.emails.length) {
-    try {
-      state.emails = await api("/api/emails");
-    } catch (err) {
-      host.innerHTML = emptyState("i-alert", "Could not load the inbox", err.message);
-      return;
-    }
-  }
-
-  const rows = state.emails.filter((r) =>
-    boardState.filter === "ALL" ||
-    (r.category === "BL_COMPARISON" && r.status === boardState.filter));
-
-  const chips = BOARD_FILTERS.map(([key, label]) => {
-    const n = key === "ALL"
-      ? state.emails.filter((r) => r.category === "BL_COMPARISON").length
-      : state.emails.filter((r) => r.category === "BL_COMPARISON" && r.status === key).length;
-    return `<button class="bchip${boardState.filter === key ? " on" : ""}"
-              type="button" data-filter="${key}">
-        <i class="dot d-${key}"></i>${esc(label)}<em>${n}</em></button>`;
-  }).join("");
-
+/** The five lanes, over rows the shared filter has already narrowed.
+ *  Pure markup: the queue owns the data and the filtering. */
+function boardLanes(rows) {
   const lanes = CATEGORY_LANES.map(([key, blurb]) => {
     const inLane = rows.filter((r) => r.category === key);
     const total = state.emails.filter((r) => r.category === key).length;
     const cards = inLane.length
       ? inLane.map(boardCard).join("")
-      : `<p class="lane-empty">Nothing in this filter.</p>`;
+      : `<p class="lane-empty">Nothing here under this filter.</p>`;
     return `<section class="lane${key === "BL_COMPARISON" ? " key" : ""}" data-cat="${key}">
       <header class="lane-h">
         <h2>
@@ -1104,7 +1130,8 @@ async function renderBoard() {
             <span class="enum mono">${esc(key)}</span>
             ${key === "BL_COMPARISON" ? `<span class="lane-flag">primary desk</span>` : ""}
           </span>
-          <span class="lane-count mono">${total}</span>
+          <span class="lane-count mono">${inLane.length === total ? total
+            : `${inLane.length}<span class="of">/${total}</span>`}</span>
         </h2>
         <p>${esc(blurb)}</p>
       </header>
@@ -1112,13 +1139,90 @@ async function renderBoard() {
     </section>`;
   }).join("");
 
-  host.innerHTML = `
-    <div class="board-bar">${chips}</div>
-    <div class="board">${lanes}</div>`;
+  return `<div class="board">${lanes}</div>`;
+}
 
-  host.querySelectorAll(".bchip").forEach((b) =>
-    b.addEventListener("click", () => {
-      boardState.filter = b.dataset.filter;
-      renderBoard();
-    }));
+
+/* ------------------------------------------------------------------ dialog */
+/* Reading one verdict from the board should not cost you your place in the
+   lanes, so a card opens a dialog over them rather than navigating away.
+   Uses <dialog> so the browser handles focus trapping and Escape. */
+
+async function openBoardDialog(emailId) {
+  const dlg = el("card-dialog");
+  wireDialogDismissal();
+  const host = el("card-dialog-body");
+  dlg.showModal();
+  host.innerHTML = `<div class="skeleton" style="height:260px"></div>`;
+
+  let d = state.details[emailId];
+  if (!d) {
+    try {
+      d = state.details[emailId] = await api(`/api/emails/${encodeURIComponent(emailId)}`);
+    } catch (err) {
+      host.innerHTML = `<p class="note diff">Could not load ${esc(emailId)}: ${esc(err.message)}</p>`;
+      return;
+    }
+  }
+
+  const isComparison = d.category === "BL_COMPARISON";
+  let banner;
+  if (!isComparison) {
+    banner = `<div class="banner info"><svg class="ico" viewBox="0 0 24 24"><use href="#i-mail"></use></svg>
+      <span>Classified <code>${esc(d.category)}</code>, so no comparison was run.</span></div>`;
+  } else if (d.status === "MISMATCH") {
+    banner = `<div class="banner MISMATCH"><svg class="ico" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>
+      <span>Discrepancy in ${(d.defect_fields || []).map((f) => `<code>${esc(f)}</code>`).join(" and ")}.
+      The other fields match.</span></div>`;
+  } else if (d.status === "NEEDS_REVIEW") {
+    banner = `<div class="banner NEEDS_REVIEW"><svg class="ico" viewBox="0 0 24 24"><use href="#i-hand"></use></svg>
+      <span>${esc(REVIEW_REASONS[d.review_reason] || "Sent for review.")}</span></div>`;
+  } else {
+    banner = `<div class="banner OK"><svg class="ico" viewBox="0 0 24 24"><use href="#i-check"></use></svg>
+      <span>All seven fields agree between the Shipping Instruction and the draft Bill of Lading.</span></div>`;
+  }
+
+  host.innerHTML = `
+    <div class="dlg-head">
+      <div style="min-width:0">
+        <div class="dlg-ids">
+          <code>${esc(d.email_id)}</code>${statusPill(d)}
+        </div>
+        <h2>${esc(d.subject) || "(no subject)"}</h2>
+        <p class="detail-meta"><code>${esc(d.from || "unknown sender")}</code></p>
+      </div>
+      <button class="icon-btn" id="card-dialog-close" aria-label="Close">&times;</button>
+    </div>
+    ${banner}
+    ${verdictTable(d) || `<p class="note">No field comparison ran on this email.</p>`}
+    <p class="dlg-foot">
+      <a class="act" href="#/inbox/${encodeURIComponent(d.email_id)}">Open in the queue</a>
+      <span class="faint">for the full decision trace</span>
+    </p>`;
+
+  el("card-dialog-close").addEventListener("click", () => dlg.close());
+
+  // "Open in the queue" has to switch the layout as well as navigate: the
+  // queue renders in whichever mode is current, so leaving it on board would
+  // land the reader back on the lanes with nothing opened.
+  host.querySelector(".act").addEventListener("click", () => {
+    state.mode = "list";
+    dlg.close();
+  });
+}
+
+/** Native <dialog> does not close on a backdrop click, so wire it once.
+ *  Comparing against the dialog's own box is more reliable than checking the
+ *  event target: padding on the dialog still reports the dialog as target. */
+function wireDialogDismissal() {
+  const dlg = el("card-dialog");
+  if (!dlg || dlg.dataset.wired) return;
+  dlg.dataset.wired = "1";
+  dlg.addEventListener("click", (event) => {
+    const box = dlg.getBoundingClientRect();
+    const outside =
+      event.clientX < box.left || event.clientX > box.right ||
+      event.clientY < box.top  || event.clientY > box.bottom;
+    if (outside) dlg.close();
+  });
 }
