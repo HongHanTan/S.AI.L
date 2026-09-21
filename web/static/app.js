@@ -113,11 +113,12 @@ function emptyState(icon, title, body) {
 
 function parseHash() {
   const parts = (location.hash || "#/overview").replace(/^#\/?/, "").split("/").filter(Boolean);
-  const view = ["overview", "inbox", "review", "try"].includes(parts[0]) ? parts[0] : "overview";
+  const view = ["overview", "inbox", "board", "review", "try"].includes(parts[0]) ? parts[0] : "overview";
   return { view, id: parts[1] || null, tab: parts[2] === "evidence" ? "evidence" : "report" };
 }
 
-const TITLES = { overview: "Overview", inbox: "Inbox", review: "Review queue", try: "Try an email" };
+const TITLES = { overview: "Overview", inbox: "Inbox", board: "Category board",
+                 review: "Review queue", try: "Try an email" };
 
 async function route() {
   const { view, id, tab } = parseHash();
@@ -138,6 +139,7 @@ async function route() {
 
   if (view === "overview") await renderOverview();
   if (view === "inbox")    await renderInbox();
+  if (view === "board")    await renderBoard();
   if (view === "review")   await renderReview();
   if (view === "try")      renderTry();
 }
@@ -601,6 +603,28 @@ async function renderDetail() {
   const notes = (d.notes || []).length
     ? `<div class="notes">${d.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</div>` : "";
 
+  // The original email, when the inbox is on disk. Brought over from yikkai's
+  // ui-redesign branch: seeing the message a customer actually sent, next to
+  // the verdict, is what makes the verdict checkable rather than asserted.
+  // The API returns nothing when the inbox is absent, as on the deployment.
+  const original = d.body
+    ? `<details class="original" open>
+         <summary>
+           <svg class="ico" viewBox="0 0 24 24"><use href="#i-mail"></use></svg>
+           Original email
+           ${(d.attachment_names || []).length
+             ? `<em>${d.attachment_names.length} attachment${d.attachment_names.length === 1 ? "" : "s"}</em>`
+             : `<em>no attachments</em>`}
+         </summary>
+         <pre class="original-body">${esc(d.body)}</pre>
+         ${(d.attachment_names || []).length
+           ? `<p class="original-files">${d.attachment_names
+                .map((n) => `<span class="file-chip"><svg class="ico" viewBox="0 0 24 24"><use href="#i-files"></use></svg>${esc(n)}</span>`)
+                .join("")}</p>`
+           : ""}
+       </details>`
+    : "";
+
   const body = state.tab === "evidence"
     ? (evidenceTable(d) || `<p class="note" style="margin-top:16px">No comparison ran, so there is no trace to show.</p>`)
     : (verdictTable(d) + ladder(d) + adjudicator(d)) ||
@@ -628,7 +652,7 @@ async function renderDetail() {
     </div>
 
     ${banner}
-    ${notes}
+    ${notes}${original}
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="report"
@@ -950,3 +974,151 @@ window.addEventListener("hashchange", route);
   }
   route();
 })();
+
+
+/* ------------------------------------------------------------------- board */
+/* Category board.
+   Ported from yikkai's `ui-redesign` branch onto this dashboard's rendering
+   idiom. The lane order, the wording of each blurb, the decision to show the
+   category enum verbatim, and the "primary desk" emphasis on BL_COMPARISON are
+   all theirs — see the merge parents for the original commits.
+
+   Lanes are named after what the emails *are*, not what to do with them: an
+   earlier "Document check" heading made reviewers read cleared tickets sitting
+   in the lane as outstanding work. The keys are the category enum from
+   src/sdoc/models.py, which is what submission.json is scored on, shown
+   verbatim so a lane maps onto an evaluation key with no translation step. */
+
+const CATEGORY_LANES = [
+  ["BL_COMPARISON",  "Draft checked against instruction"],
+  ["SI_REQUEST",     "Shipping instruction sent or requested"],
+  ["INVOICE_QUERY",  "Charges, invoices and fees"],
+  ["GENERAL",        "Correspondence and operational updates"],
+  ["SPAM",           "Promotions and phishing"],
+];
+
+const FIELD_LABEL = {
+  shipper: "Shipper", consignee: "Consignee", notify_party: "Notify party",
+  port_of_loading: "Port of loading", port_of_discharge: "Port of discharge",
+  container_count: "Container count", gross_weight_kg: "Gross weight",
+};
+
+const BOARD_FILTERS = [
+  ["ALL", "All"],
+  ["MISMATCH", "Mismatch found"],
+  ["NEEDS_REVIEW", "Needs review"],
+  ["OK", "Cleared"],
+];
+
+const boardState = { filter: "ALL" };
+
+/** "5RSG-00133" style booking reference, if the subject carries one. */
+function bookingRef(subject) {
+  const m = String(subject || "").match(/\b\d[A-Z]{3}-\d{5}\b/);
+  return m ? m[0] : "";
+}
+
+/** "→ Callao, Peru" — the route, when the subject names a destination. */
+function routeOf(subject) {
+  const m = String(subject || "").match(/\b([A-Z][A-Za-z ]+)_([A-Z][A-Za-z]+)\b/);
+  if (!m) return "";
+  const city = m[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
+  const country = m[2].replace(/\b\w/g, (c) => c.toUpperCase());
+  return `${city}, ${country}`;
+}
+
+function seqNumber(emailId) {
+  const m = String(emailId || "").match(/(\d+)/);
+  return m ? m[1] : "";
+}
+
+/** What this email amounts to, in one line. */
+function boardOutcome(rec) {
+  if (rec.category !== "BL_COMPARISON") return { cls: "", text: "" };
+  if (rec.status === "MISMATCH") {
+    const names = (rec.defect_fields || []).map((f) => FIELD_LABEL[f] || f).join(", ");
+    return { cls: "bad", text: `${names} differ` };
+  }
+  if (rec.status === "NEEDS_REVIEW") {
+    return { cls: "warn", text: REVIEW_REASONS[rec.review_reason] || "Needs a person" };
+  }
+  return { cls: "ok", text: "All 7 fields match" };
+}
+
+function boardCard(rec) {
+  const ref = bookingRef(rec.subject);
+  const route = routeOf(rec.subject);
+  const outcome = boardOutcome(rec);
+  const hasAttachments = rec.attachment_count > 0;
+
+  return `<a class="bcard" href="#/inbox/${encodeURIComponent(rec.email_id)}"
+             data-status="${esc(rec.status)}">
+    <span class="bcard-top">
+      <span class="bcard-ref mono">${esc(ref || "—")}</span>
+      <span class="bcard-seq mono">#${esc(seqNumber(rec.email_id))}</span>
+    </span>
+    ${route ? `<span class="bcard-route">&rarr; ${esc(route)}</span>` : ""}
+    <span class="bcard-subject">${esc(rec.subject || "(no subject)")}</span>
+    ${outcome.text
+      ? `<span class="bcard-outcome ${outcome.cls}">${esc(outcome.text)}</span>`
+      : `<span class="bcard-att">${hasAttachments
+            ? `${rec.attachment_count} attachment${rec.attachment_count === 1 ? "" : "s"}`
+            : "No attachments"}</span>`}
+  </a>`;
+}
+
+async function renderBoard() {
+  const host = el("view-board");
+  if (!state.emails.length) {
+    try {
+      state.emails = await api("/api/emails");
+    } catch (err) {
+      host.innerHTML = emptyState("i-alert", "Could not load the inbox", err.message);
+      return;
+    }
+  }
+
+  const rows = state.emails.filter((r) =>
+    boardState.filter === "ALL" ||
+    (r.category === "BL_COMPARISON" && r.status === boardState.filter));
+
+  const chips = BOARD_FILTERS.map(([key, label]) => {
+    const n = key === "ALL"
+      ? state.emails.filter((r) => r.category === "BL_COMPARISON").length
+      : state.emails.filter((r) => r.category === "BL_COMPARISON" && r.status === key).length;
+    return `<button class="bchip${boardState.filter === key ? " on" : ""}"
+              type="button" data-filter="${key}">
+        <i class="dot d-${key}"></i>${esc(label)}<em>${n}</em></button>`;
+  }).join("");
+
+  const lanes = CATEGORY_LANES.map(([key, blurb]) => {
+    const inLane = rows.filter((r) => r.category === key);
+    const total = state.emails.filter((r) => r.category === key).length;
+    const cards = inLane.length
+      ? inLane.map(boardCard).join("")
+      : `<p class="lane-empty">Nothing in this filter.</p>`;
+    return `<section class="lane${key === "BL_COMPARISON" ? " key" : ""}" data-cat="${key}">
+      <header class="lane-h">
+        <h2>
+          <span class="lane-name">
+            <span class="enum mono">${esc(key)}</span>
+            ${key === "BL_COMPARISON" ? `<span class="lane-flag">primary desk</span>` : ""}
+          </span>
+          <span class="lane-count mono">${total}</span>
+        </h2>
+        <p>${esc(blurb)}</p>
+      </header>
+      <div class="lane-body">${cards}</div>
+    </section>`;
+  }).join("");
+
+  host.innerHTML = `
+    <div class="board-bar">${chips}</div>
+    <div class="board">${lanes}</div>`;
+
+  host.querySelectorAll(".bchip").forEach((b) =>
+    b.addEventListener("click", () => {
+      boardState.filter = b.dataset.filter;
+      renderBoard();
+    }));
+}

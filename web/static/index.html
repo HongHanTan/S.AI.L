@@ -15,6 +15,7 @@
 <svg class="sprite" aria-hidden="true" focusable="false">
   <symbol id="i-overview" viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></symbol>
   <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 9v5h14v-5h-4a3 3 0 0 1-6 0H5Zm0-2h6l.4.9a1 1 0 0 0 .9.6h.4a1 1 0 0 0 .9-.6L14 11h5V6H5v5Z"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><path d="M3 4h5v16H3V4Zm6.5 0h5v16h-5V4ZM16 4h5v16h-5V4Z"/></symbol>
   <symbol id="i-review" viewBox="0 0 24 24"><path d="M12 3 4 7v6c0 4.4 3.4 7.9 8 8.9 4.6-1 8-4.5 8-8.9V7l-8-4Zm-1 13-3.5-3.5 1.4-1.4L11 13.2l4.1-4.1 1.4 1.4L11 16Z"/></symbol>
   <symbol id="i-try" viewBox="0 0 24 24"><path d="m3.4 20.6 18-8a1 1 0 0 0 0-1.8l-18-8a1 1 0 0 0-1.4 1.1L3.6 9.5a1 1 0 0 0 .8.8l8 1.5a.2.2 0 0 1 0 .4l-8 1.5a1 1 0 0 0-.8.8L2 19.5a1 1 0 0 0 1.4 1.1Z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M10 4a6 6 0 1 0 3.6 10.8l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4Zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></symbol>
@@ -50,6 +51,10 @@
         <svg class="ico" viewBox="0 0 24 24"><use href="#i-inbox"></use></svg><span>Inbox</span>
         <em class="count" id="count-inbox"></em>
       </a>
+      <a class="nav-item" href="#/board" data-view="board">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-board"></use></svg><span>Category board</span>
+        <em class="count" id="count-board"></em>
+      </a>
       <a class="nav-item" href="#/review" data-view="review">
         <svg class="ico" viewBox="0 0 24 24"><use href="#i-review"></use></svg><span>Review queue</span>
         <em class="count count-warn" id="count-review"></em>
@@ -84,6 +89,7 @@
     <main class="views">
       <section id="view-overview" class="view" tabindex="-1"></section>
       <section id="view-inbox"    class="view" tabindex="-1" hidden></section>
+      <section id="view-board"    class="view" tabindex="-1" hidden></section>
       <section id="view-review"   class="view" tabindex="-1" hidden></section>
       <section id="view-try"      class="view" tabindex="-1" hidden></section>
     </main>

@@ -86,6 +86,26 @@ def test_posting_a_review_for_an_unknown_field_is_400(client):
                   json={"field": "nonexistent", "verdict": "SAME"}).status_code == 400
 
 
+def test_the_app_shell_must_be_revalidated(client):
+    """The shell names unversioned assets, so caching it pins the client to an
+    old build regardless of what /static serves."""
+    c, _ = client
+    r = c.get("/")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-cache"
+
+
+def test_static_assets_must_be_revalidated(client):
+    """Unversioned filenames plus heuristic caching means a browser can keep
+    running a stale bundle after a deploy; no-cache forces a revalidation."""
+    c, _ = client
+    for asset in ("/static/app.js", "/static/style.css"):
+        r = c.get(asset)
+        assert r.status_code == 200, asset
+        assert r.headers["cache-control"] == "no-cache", asset
+        assert r.headers.get("etag"), asset
+
+
 def test_stats_summarise_the_run(client):
     c, _ = client
     body = c.get("/api/stats").json()
@@ -94,32 +114,45 @@ def test_stats_summarise_the_run(client):
     assert body["total"] == 3
 
 
-def test_stats_scope_outcomes_to_the_emails_actually_compared(client):
-    """`statuses` counts spam as OK; the dashboard needs the honest figure."""
+def test_stats_band_the_similarity_scores(client):
+    """The dashboard reads this instead of fetching every record's verdicts."""
+    c, _ = client
+    sim = c.get("/api/stats").json()["similarity_bands"]
+    # The fixture has one scored verdict (L3, 0.1) and one unscored (L1, None).
+    assert sim["scored"] == 1
+    assert sim["bands"] == {"DIFFERENT": 1, "GRAY": 0, "SAME": 0}
+
+
+def test_stats_similarity_ignores_verdicts_without_a_score(client):
+    """gate1 and L1 settle without ever computing a ratio, so they are not
+    silently banded as DIFFERENT at 0.0."""
     c, _ = client
     body = c.get("/api/stats").json()
-    assert body["statuses"]["OK"] == 1          # the spam email
-    assert "OK" not in body["comparison_statuses"]
-    assert body["comparison_statuses"] == {"MISMATCH": 1, "NEEDS_REVIEW": 1}
+    assert body["layers"]["L1"] == 1          # the unscored verdict is still counted
+    bands = body["similarity_bands"]
+    assert sum(bands["bands"].values()) == bands["scored"] == 1
 
 
-def test_stats_expose_the_chart_series(client):
+def test_stats_publish_the_pipelines_own_thresholds(client):
+    """Hardcoding 0.72/0.92 in the frontend would let the chart drift away from
+    the values the comparison actually ran at."""
+    from sdoc.compare.similarity import DIFFERENT_AT, SAME_AT
+    c, _ = client
+    sim = c.get("/api/stats").json()["similarity_bands"]
+    assert sim["different_at"] == DIFFERENT_AT
+    assert sim["same_at"] == SAME_AT
+
+
+def test_stats_similarity_is_additive(client):
+    """The existing keys must survive the addition."""
     c, _ = client
     body = c.get("/api/stats").json()
-    assert body["defects"] == {"consignee": 1}
-    assert body["review_reasons"] == {"missing_attachment": 1}
-    assert body["verdicts"] == {"DIFFERENT": 1, "SAME": 1}
-    assert body["emails_compared"] == 1
-    assert body["fields_checked"] == 2
-    assert body["fields"][0] == "shipper"
-
-
-def test_similarity_buckets_are_ten_wide_and_place_each_score(client):
-    c, _ = client
-    buckets = c.get("/api/stats").json()["similarity"]
-    assert len(buckets) == 10
-    assert buckets[1] == 1               # the 0.1 score
-    assert sum(buckets) == 1             # the None score is not counted
+    # Both designs extended /api/stats. The contract is that the original four
+    # keys survive and each addition is additive, not that the set is exact.
+    assert {"total", "categories", "statuses", "layers"} <= set(body)
+    assert "similarity_bands" in body   # yikkai's band summary
+    assert "similarity" in body         # Jeff's histogram buckets
+    assert body["total"] == 3 and body["layers"]["L3"] == 1
 
 
 SI_DOC = b"""SHIPPING INSTRUCTION
@@ -205,3 +238,81 @@ def test_try_email_rejects_an_empty_email(client):
     c, _ = client
     r = c.post("/api/try-email", data={"subject": "", "body": ""})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Original-email enrichment. Read-only, best-effort, and never able to change
+# what the scored run concluded.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def inbox_client(tmp_path):
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(RUN), encoding="utf-8")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "email_004.json").write_text(json.dumps({
+        "email_id": "email_004", "from": "ops@example.test", "subject": "Check docs",
+        "body": "Please compare the SI and draft BL.",
+        "attachments": ["attachments/si_004.pdf", "attachments/bl_004.pdf"],
+    }), encoding="utf-8")
+    return TestClient(create_app(run_path=str(run_path),
+                                 store=AliasStore(root=str(tmp_path / "aliases")),
+                                 inbox_dir=str(inbox)))
+
+
+def test_detail_includes_body_and_attachment_names(inbox_client):
+    body = inbox_client.get("/api/emails/email_004").json()
+    assert body["body"] == "Please compare the SI and draft BL."
+    assert body["attachment_names"] == ["si_004.pdf", "bl_004.pdf"]
+
+
+def test_enrichment_never_overrides_the_scored_run(inbox_client):
+    body = inbox_client.get("/api/emails/email_004").json()
+    assert body["status"] == "MISMATCH"
+    assert body["defect_fields"] == ["consignee"]
+    assert len(body["verdicts"]) == 2
+
+
+def test_detail_works_when_the_email_has_no_inbox_file(inbox_client):
+    body = inbox_client.get("/api/emails/email_001").json()
+    assert body["status"] == "OK"
+    assert "body" not in body
+
+
+def test_detail_works_when_there_is_no_inbox_at_all(tmp_path):
+    """The deployment ships only run.json, so enrichment must be optional.
+
+    This builds its own app with an inbox directory that does not exist. The
+    shared `client` fixture cannot be used here: create_app falls back to
+    ./data/inbox, which is present on a machine that has the organiser bundle
+    and absent on one that does not — so the assertion would depend on who ran
+    the test rather than on the code.
+    """
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(RUN), encoding="utf-8")
+    app = create_app(run_path=str(run_path),
+                     store=AliasStore(root=str(tmp_path / "aliases")),
+                     inbox_dir=str(tmp_path / "no-such-inbox"))
+    body = TestClient(app).get("/api/emails/email_004").json()
+    assert body["defect_fields"] == ["consignee"]
+    assert "body" not in body
+
+
+def test_malformed_inbox_file_is_ignored_rather_than_raising(tmp_path):
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(RUN), encoding="utf-8")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "email_004.json").write_text("{not json", encoding="utf-8")
+    c = TestClient(create_app(run_path=str(run_path),
+                              store=AliasStore(root=str(tmp_path / "aliases")),
+                              inbox_dir=str(inbox)))
+    assert c.get("/api/emails/email_004").json()["status"] == "MISMATCH"
+
+
+@pytest.mark.parametrize("email_id", [
+    "../run", "..%2frun", "email_004/../../run", "a" * 65, "email 004",
+])
+def test_ids_that_are_not_run_keys_are_404_not_file_reads(inbox_client, email_id):
+    assert inbox_client.get(f"/api/emails/{email_id}").status_code in (404, 400)

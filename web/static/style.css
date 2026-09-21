@@ -430,3 +430,151 @@ input[type=file]::file-selector-button {
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
+
+/* ------------------------------------------------------------------- board */
+/* Category board, ported from yikkai's ui-redesign branch onto this theme.
+   Five lanes keyed on the category enum, BL_COMPARISON emphasised as the
+   primary desk because it is the only lane that carries real work. */
+
+.board-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+.bchip { display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 13px; border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  background: var(--card); color: var(--muted); font: 600 12px var(--sans);
+  cursor: pointer; }
+.bchip em { font-style: normal; font-family: var(--mono); font-size: 11px;
+  color: var(--faint); }
+.bchip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.bchip.on em { color: rgba(255,255,255,.7); }
+.bchip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.d-MISMATCH { background: var(--bad); }
+.d-NEEDS_REVIEW { background: var(--warn); }
+.d-OK { background: var(--ok); }
+
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr);
+  gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
+
+.lane { background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; max-height: 72vh; }
+.lane.key { border-color: #d9dafb; }
+
+.lane-h { padding: 13px 15px 11px; border-bottom: 1px solid var(--line);
+  position: relative; }
+.lane-h::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: var(--cat, var(--faint)); }
+.lane[data-cat="BL_COMPARISON"] { --cat: var(--accent); }
+.lane[data-cat="SI_REQUEST"]    { --cat: #3aa0d9; }
+.lane[data-cat="INVOICE_QUERY"] { --cat: var(--warn); }
+.lane[data-cat="GENERAL"]       { --cat: #8b8fd9; }
+.lane[data-cat="SPAM"]          { --cat: var(--bad); }
+
+.lane-h h2 { margin: 0; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; font-size: 12px; }
+.lane-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.lane-h .enum { font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--ink); }
+.lane-flag { font: 600 9px var(--sans); letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent-ink); }
+.lane-count { font-size: 13px; font-weight: 600; color: var(--muted); }
+.lane-h p { margin: 3px 0 0; font-size: 11px; color: var(--muted); }
+
+.lane-body { overflow-y: auto; padding: 9px; display: flex; flex-direction: column;
+  gap: 8px; }
+.lane-empty { margin: 10px 4px; font-size: 12px; color: var(--faint); }
+
+.bcard { display: flex; flex-direction: column; gap: 4px; padding: 10px 11px;
+  border: 1px solid var(--line); border-left: 2px solid var(--cat, var(--faint));
+  border-radius: var(--r-sm); background: var(--card); text-decoration: none;
+  color: inherit; }
+.bcard-top { display: flex; justify-content: space-between; gap: 8px; }
+.bcard-ref { font-size: 11px; font-weight: 600; color: var(--ink); }
+.bcard-seq { font-size: 10px; color: var(--faint); }
+.bcard-route { font-size: 11px; color: var(--muted); }
+.bcard-subject { font-size: 11px; color: var(--muted); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.bcard-outcome { align-self: flex-start; margin-top: 2px; padding: 3px 8px;
+  border-radius: var(--r-sm); font-size: 10px; font-weight: 600; }
+.bcard-outcome.bad  { background: var(--bad-soft);  color: var(--bad); }
+.bcard-outcome.warn { background: var(--warn-soft); color: #a4711f; }
+.bcard-outcome.ok   { background: var(--ok-soft);   color: var(--ok); }
+.bcard-att { font-size: 10px; color: var(--faint); }
+
+@media (max-width: 720px) {
+  .board { grid-auto-flow: row; grid-auto-columns: auto; }
+  .lane { max-height: none; }
+}
+
+/* ------------------------------------------------- lift on hover
+   Anything clickable rises slightly under the cursor and settles back on
+   press, so a control announces itself before it is clicked. Kept to
+   transform and shadow so it composites on the GPU, and switched off
+   entirely for anyone who asked for reduced motion. */
+
+.bchip, .bcard, .act, .icon-btn, .nav-item, button.action,
+button:not([disabled]).btn, .tab, .chip-btn {
+  transition: transform .16s cubic-bezier(.2,.7,.3,1),
+              box-shadow .16s cubic-bezier(.2,.7,.3,1),
+              background-color .16s ease, border-color .16s ease, color .16s ease;
+  will-change: transform;
+}
+
+.bchip:hover, .act:hover, .icon-btn:hover, .nav-item:hover,
+button.action:hover, button:not([disabled]).btn:hover, .tab:hover, .chip-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.bcard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--line-2);
+}
+
+.bchip:active, .bcard:active, .act:active, .icon-btn:active, .nav-item:active,
+button.action:active, button:not([disabled]).btn:active, .tab:active, .chip-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.bchip:focus-visible, .bcard:focus-visible, .act:focus-visible,
+.icon-btn:focus-visible, .nav-item:focus-visible, button.action:focus-visible {
+  transform: translateY(-2px);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bchip, .bcard, .act, .icon-btn, .nav-item, button.action, .tab, .chip-btn {
+    transition: background-color .16s ease, border-color .16s ease;
+  }
+  .bchip:hover, .bcard:hover, .act:hover, .icon-btn:hover, .nav-item:hover,
+  button.action:hover, .tab:hover, .chip-btn:hover { transform: none; }
+}
+
+/* --------------------------------------------------- the original email
+   From yikkai's ui-redesign branch: the message as it arrived, shown next to
+   the verdict so a reader can check the conclusion against the input rather
+   than take it on trust. */
+
+.original { margin-top: 16px; border: 1px solid var(--line);
+  border-radius: var(--r-md); background: var(--card); overflow: hidden; }
+.original > summary { display: flex; align-items: center; gap: 9px;
+  padding: 11px 14px; cursor: pointer; list-style: none;
+  font: 600 12px var(--sans); color: var(--ink); }
+.original > summary::-webkit-details-marker { display: none; }
+.original > summary .ico { width: 15px; height: 15px; color: var(--muted); }
+.original > summary em { margin-left: auto; font-style: normal;
+  font-size: 11px; font-weight: 500; color: var(--faint); }
+.original[open] > summary { border-bottom: 1px solid var(--line); }
+.original-body { margin: 0; padding: 13px 15px; font: 400 12px/1.65 var(--mono);
+  color: var(--muted); white-space: pre-wrap; word-break: break-word;
+  max-height: 260px; overflow-y: auto; }
+.original-files { display: flex; flex-wrap: wrap; gap: 7px;
+  margin: 0; padding: 0 15px 13px; }
+.file-chip { display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  font: 500 11px var(--mono); color: var(--muted); background: var(--canvas); }
+.file-chip .ico { width: 13px; height: 13px; color: var(--faint); }
