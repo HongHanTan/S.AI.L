@@ -125,17 +125,69 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
 
     @app.get("/api/stats")
     def stats():
+        """Summarise the run.
+
+        The first four keys are the original contract. The rest exist so the
+        dashboard can draw its charts without the browser downloading and
+        re-aggregating the whole run.
+
+        `statuses` counts every email, which flatters the OK figure because a
+        spam email is also "OK". `comparison_statuses` counts only the emails
+        that were actually put through a comparison, which is the number a
+        reader of the dashboard means.
+        """
         data = run_data()
         categories: dict[str, int] = {}
         statuses: dict[str, int] = {}
         layers: dict[str, int] = {}
+        comparison_statuses: dict[str, int] = {}
+        defects: dict[str, int] = {}
+        review_reasons: dict[str, int] = {}
+        verdicts: dict[str, int] = {}
+        # Ten buckets of 0.1 across the token-set ratio, so the L3 thresholds
+        # at 0.72 and 0.92 can be drawn against the real distribution.
+        similarity = [0] * 10
+        compared = 0
+
         for rec in data.values():
             categories[rec["category"]] = categories.get(rec["category"], 0) + 1
             statuses[rec["status"]] = statuses.get(rec["status"], 0) + 1
-            for v in rec.get("verdicts", []):
+
+            if rec["category"] == "BL_COMPARISON":
+                comparison_statuses[rec["status"]] = \
+                    comparison_statuses.get(rec["status"], 0) + 1
+
+            for f in rec.get("defect_fields") or []:
+                defects[f] = defects.get(f, 0) + 1
+
+            if rec["status"] == "NEEDS_REVIEW" and rec.get("review_reason"):
+                reason = rec["review_reason"]
+                review_reasons[reason] = review_reasons.get(reason, 0) + 1
+
+            rec_verdicts = rec.get("verdicts") or []
+            if rec_verdicts:
+                compared += 1
+            for v in rec_verdicts:
                 layers[v["decided_by"]] = layers.get(v["decided_by"], 0) + 1
-        return {"total": len(data), "categories": categories,
-                "statuses": statuses, "layers": layers}
+                verdicts[v["verdict"]] = verdicts.get(v["verdict"], 0) + 1
+                score = v.get("similarity")
+                if score is not None:
+                    similarity[min(int(float(score) * 10), 9)] += 1
+
+        return {
+            "total": len(data),
+            "categories": categories,
+            "statuses": statuses,
+            "layers": layers,
+            "comparison_statuses": comparison_statuses,
+            "defects": defects,
+            "review_reasons": review_reasons,
+            "verdicts": verdicts,
+            "similarity": similarity,
+            "emails_compared": compared,
+            "fields_checked": sum(verdicts.values()),
+            "fields": list(FIELDS),
+        }
 
     @app.get("/", response_class=HTMLResponse)
     def index():
@@ -148,6 +200,20 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None) -> F
                 detail=f"index.html missing from the deployment at {page}",
             )
         return page.read_text(encoding="utf-8")
+
+    @app.middleware("http")
+    async def revalidate_static(request, call_next):
+        """Make browsers revalidate the CSS and JS on every load.
+
+        StaticFiles sends an ETag but no Cache-Control, so a browser is free to
+        serve a heuristically cached copy — which means a redeploy can leave
+        someone on the old front end with no way to tell. `no-cache` still lets
+        the 304 path do its job; it only forbids using a copy without asking.
+        """
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
     static_dir = WEB_DIR / "static"
     if static_dir.exists():

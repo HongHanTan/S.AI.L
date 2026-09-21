@@ -94,6 +94,34 @@ def test_stats_summarise_the_run(client):
     assert body["total"] == 3
 
 
+def test_stats_scope_outcomes_to_the_emails_actually_compared(client):
+    """`statuses` counts spam as OK; the dashboard needs the honest figure."""
+    c, _ = client
+    body = c.get("/api/stats").json()
+    assert body["statuses"]["OK"] == 1          # the spam email
+    assert "OK" not in body["comparison_statuses"]
+    assert body["comparison_statuses"] == {"MISMATCH": 1, "NEEDS_REVIEW": 1}
+
+
+def test_stats_expose_the_chart_series(client):
+    c, _ = client
+    body = c.get("/api/stats").json()
+    assert body["defects"] == {"consignee": 1}
+    assert body["review_reasons"] == {"missing_attachment": 1}
+    assert body["verdicts"] == {"DIFFERENT": 1, "SAME": 1}
+    assert body["emails_compared"] == 1
+    assert body["fields_checked"] == 2
+    assert body["fields"][0] == "shipper"
+
+
+def test_similarity_buckets_are_ten_wide_and_place_each_score(client):
+    c, _ = client
+    buckets = c.get("/api/stats").json()["similarity"]
+    assert len(buckets) == 10
+    assert buckets[1] == 1               # the 0.1 score
+    assert sum(buckets) == 1             # the None score is not counted
+
+
 SI_DOC = b"""SHIPPING INSTRUCTION
 ========================================
 

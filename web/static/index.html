@@ -2,32 +2,96 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Shipping Document Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1>Shipping Document Verification</h1>
-    <nav>
-      <button data-view="inbox" class="active">Inbox</button>
-      <button data-view="report">Report</button>
-      <button data-view="evidence">Evidence</button>
-      <button data-view="review">Review queue</button>
-      <button data-view="compare">Try an email</button>
+
+<!-- Icon sprite. Inlined so the app has no runtime dependency on an icon CDN. -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-overview" viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 9v5h14v-5h-4a3 3 0 0 1-6 0H5Zm0-2h6l.4.9a1 1 0 0 0 .9.6h.4a1 1 0 0 0 .9-.6L14 11h5V6H5v5Z"/></symbol>
+  <symbol id="i-review" viewBox="0 0 24 24"><path d="M12 3 4 7v6c0 4.4 3.4 7.9 8 8.9 4.6-1 8-4.5 8-8.9V7l-8-4Zm-1 13-3.5-3.5 1.4-1.4L11 13.2l4.1-4.1 1.4 1.4L11 16Z"/></symbol>
+  <symbol id="i-try" viewBox="0 0 24 24"><path d="m3.4 20.6 18-8a1 1 0 0 0 0-1.8l-18-8a1 1 0 0 0-1.4 1.1L3.6 9.5a1 1 0 0 0 .8.8l8 1.5a.2.2 0 0 1 0 .4l-8 1.5a1 1 0 0 0-.8.8L2 19.5a1 1 0 0 0 1.4 1.1Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M10 4a6 6 0 1 0 3.6 10.8l4.3 4.3 1.4-1.4-4.3-4.3A6 6 0 0 0 10 4Zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 2 1 21h22L12 2Zm0 6 1 7h-2l1-7Zm0 9.5a1.2 1.2 0 1 1 0 2.5 1.2 1.2 0 0 1 0-2.5Z"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M12 2a1.5 1.5 0 0 1 1.5 1.5v6h1v-5a1.5 1.5 0 0 1 3 0v8.6l1.2-2.1a1.5 1.5 0 0 1 2.6 1.5l-3 5.2A6 6 0 0 1 12.1 22H11a6 6 0 0 1-6-6V9.5a1.5 1.5 0 0 1 3 0v3h1v-9A1.5 1.5 0 0 1 10.5 2h1.5Z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm1 3.2V17h16V8.2l-8 5-8-5ZM19.4 7H4.6l7.4 4.6L19.4 7Z"/></symbol>
+  <symbol id="i-files" viewBox="0 0 24 24"><path d="M8 2h6l5 5v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm5 2v4h4l-4-4ZM4 6v14a2 2 0 0 0 2 2h9v-2H6V6H4Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9.5 17.6 3.9 12l1.4-1.4 4.2 4.2 9.2-9.2L20.1 7 9.5 17.6Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.9v16.2a1 1 0 0 0 1.5.9l13-8.1a1 1 0 0 0 0-1.8l-13-8.1A1 1 0 0 0 6 3.9Z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M11.4 5.6 12.8 7l-4 4H21v2H8.8l4 4-1.4 1.4L5 12l6.4-6.4Z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9.3 6.7 14.6 12l-5.3 5.3 1.4 1.4L17.4 12l-6.7-6.7-1.4 1.4Z"/></symbol>
+</svg>
+
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="rail" id="rail">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M3 10h18l-1.6 7.2a2 2 0 0 1-2 1.8H6.6a2 2 0 0 1-2-1.8L3 10Zm2.5-5h13l.8 3H4.7l.8-3Z"/></svg>
+      </span>
+      <span class="brand-text">
+        <b>SIBL</b>
+        <small>Document Verification</small>
+      </span>
+    </div>
+
+    <nav class="nav" aria-label="Sections">
+      <a class="nav-item" href="#/overview" data-view="overview">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-overview"></use></svg><span>Overview</span>
+      </a>
+      <a class="nav-item" href="#/inbox" data-view="inbox">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-inbox"></use></svg><span>Inbox</span>
+        <em class="count" id="count-inbox"></em>
+      </a>
+      <a class="nav-item" href="#/review" data-view="review">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-review"></use></svg><span>Review queue</span>
+        <em class="count count-warn" id="count-review"></em>
+      </a>
+      <a class="nav-item" href="#/try" data-view="try">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-try"></use></svg><span>Try an email</span>
+      </a>
     </nav>
-  </header>
 
-  <section id="stats"></section>
+    <div class="rail-foot">
+      <div class="source-card">
+        <span class="eyebrow">Source</span>
+        <code id="source-name">run.json</code>
+        <small id="source-meta">loading&hellip;</small>
+      </div>
+    </div>
+  </aside>
 
-  <main>
-    <div id="inbox" class="view"></div>
-    <div id="report" class="view" hidden></div>
-    <div id="evidence" class="view" hidden></div>
-    <div id="review" class="view" hidden></div>
-    <div id="compare" class="view" hidden></div>
-  </main>
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn rail-toggle" id="rail-toggle" aria-label="Show sections" aria-expanded="false">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-overview"></use></svg>
+      </button>
+      <h1 id="page-title">Overview</h1>
+      <div class="search" id="search-wrap">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-search"></use></svg>
+        <input type="search" id="q" placeholder="Search subject, sender or id" autocomplete="off" aria-label="Search emails">
+      </div>
+    </header>
 
-  <script src="/static/app.js"></script>
+    <main class="views">
+      <section id="view-overview" class="view" tabindex="-1"></section>
+      <section id="view-inbox"    class="view" tabindex="-1" hidden></section>
+      <section id="view-review"   class="view" tabindex="-1" hidden></section>
+      <section id="view-try"      class="view" tabindex="-1" hidden></section>
+    </main>
+  </div>
+</div>
+
+<div class="rail-scrim" id="rail-scrim" hidden></div>
+
+<script src="/static/app.js"></script>
 </body>
 </html>
