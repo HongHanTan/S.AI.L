@@ -823,6 +823,24 @@ async function renderReview() {
 
 const tryPreviews = new Map();
 
+/* Files chosen so far. A file input replaces its whole selection each time the
+   picker closes, so picking the SI and then the BL would silently drop the SI.
+   We keep our own list and add to it instead. */
+const tryFiles = [];
+
+function addTryFiles(picked) {
+  for (const file of picked) {
+    const already = tryFiles.some(
+      (f) => f.name === file.name && f.size === file.size);
+    if (!already) tryFiles.push(file);
+  }
+}
+
+function removeTryFile(name) {
+  const i = tryFiles.findIndex((f) => f.name === name);
+  if (i >= 0) tryFiles.splice(i, 1);
+}
+
 function renderTry() {
   const target = el("view-try");
   if (target.dataset.ready) return;
@@ -901,7 +919,11 @@ function renderTry() {
     </dialog>`;
 
   el("cmp-run").addEventListener("click", runCompare);
-  el("cmp-files").addEventListener("change", inspectTryAttachments);
+  el("cmp-files").addEventListener("change", (event) => {
+    const picked = [...event.target.files];
+    event.target.value = "";     // so the same file can be chosen again
+    inspectTryAttachments(picked);
+  });
   el("preview-close").addEventListener("click", () => el("attachment-preview").close());
 
   el("cmp-eg1").addEventListener("click", () => {
@@ -924,8 +946,34 @@ function renderTry() {
   });
 }
 
-async function inspectTryAttachments() {
-  const files = [...el("cmp-files").files];
+/** Draw the chosen files. Independent of inspection: if /api/inspect fails we
+ *  still have to show what the user picked, or a failed request is
+ *  indistinguishable from a file that never got added. */
+function renderTryFileList() {
+  const host = el("cmp-file-list");
+  if (!host) return;
+  host.innerHTML = tryFiles.map((file) => {
+    const doc = tryPreviews.get(file.name);
+    return `<div class="upload-row"><span class="mono">${esc(file.name)}</span>
+      <span class="muted">${doc ? esc((doc.detected_type || doc.format || "file").toUpperCase()) : ""}</span>
+      <button class="btn btn-ghost btn-sm preview-file" data-file="${esc(file.name)}"
+        ${doc ? "" : "disabled"}>Preview</button>
+      <button class="btn btn-ghost btn-sm remove-file" data-file="${esc(file.name)}"
+        aria-label="Remove ${esc(file.name)}">&times;</button></div>`;
+  }).join("");
+  host.querySelectorAll(".remove-file").forEach((button) =>
+    button.addEventListener("click", () => {
+      removeTryFile(button.dataset.file);
+      renderTryFileList();
+      inspectTryAttachments();
+    }));
+  host.querySelectorAll(".preview-file").forEach((button) =>
+    button.addEventListener("click", () => openAttachmentPreview(button.dataset.file)));
+}
+
+async function inspectTryAttachments(picked) {
+  if (picked) addTryFiles(picked);
+  const files = tryFiles;
   const message = el("cmp-context-msg");
   tryPreviews.clear();
   el("cmp-carrier").value = "";
@@ -938,8 +986,9 @@ async function inspectTryAttachments() {
     el("cmp-file-list").innerHTML = "";
     return;
   }
-
-  message.textContent = "Reading attachments and detecting shipment contextâ€¦";
+  renderTryFileList();
+  message.textContent =
+    `${files.length} file${files.length === 1 ? "" : "s"} selected. Reading and detecting shipment context...`;
   const form = new FormData();
   for (const file of files) form.append("files", file);
   try {
@@ -959,17 +1008,11 @@ async function inspectTryAttachments() {
     const found = [context.carrier, route].filter(Boolean).join(" Â· ");
     message.textContent = found ? `Detected from attachments: ${found}`
       : "No carrier or route could be confidently extracted.";
-    el("cmp-file-list").innerHTML = files.map((file) => {
-      const doc = tryPreviews.get(file.name);
-      return `<div class="upload-row"><span class="mono">${esc(file.name)}</span>
-        <span class="muted">${doc ? esc((doc.detected_type || doc.format || "file").toUpperCase()) : ""}</span>
-        <button class="btn btn-ghost btn-sm preview-file" data-file="${esc(file.name)}"
-          ${doc ? "" : "disabled"}>Preview</button></div>`;
-    }).join("");
-    el("cmp-file-list").querySelectorAll(".preview-file").forEach((button) =>
-      button.addEventListener("click", () => openAttachmentPreview(button.dataset.file)));
+    renderTryFileList();
   } catch (error) {
-    message.textContent = error.message;
+    renderTryFileList();
+    message.textContent =
+      `${files.length} file${files.length === 1 ? "" : "s"} selected. ${error.message}`;
   }
 }
 
@@ -1004,7 +1047,7 @@ async function runCompare() {
   form.append("subject", subject);
   form.append("body", body);
   form.append("sender", el("cmp-from").value);
-  for (const file of el("cmp-files").files) form.append("files", file);
+  for (const file of tryFiles) form.append("files", file);
 
   try {
     const response = await fetch("/api/try-email", { method: "POST", body: form });
