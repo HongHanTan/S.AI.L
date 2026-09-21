@@ -1302,17 +1302,38 @@ const FIELD_LABEL = {
 
 /** "5RSG-00133" style booking reference, if the subject carries one. */
 function bookingRef(subject) {
-  const m = String(subject || "").match(/\d[A-Z]{3}-\d{5}/);
+  const m = String(subject || "").match(/\b\d[A-Z]{3}-\d{5}\b/);
   return m ? m[0] : "";
 }
 
-/** "Callao, Peru" - the route, when the subject names a destination. */
+/** Title case from the shouted upper case the subjects arrive in. */
+const titleWord = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+const titleCase = (text) => text.split(" ").map(titleWord).join(" ");
+
+/** As above, but a short all-caps run in a country is a code rather than a
+ *  word: US and UAE are names in their own right and "Us" reads as the
+ *  pronoun. The rule is confined to the country half, because in a city the
+ *  same run is an ordinary name - Jebel ALI and NEW York, otherwise.
+ */
+const countryCase = (text) => text.split(" ")
+  .map((w) => (/^[A-Z]{2,3}$/.test(w) ? w : titleWord(w))).join(" ");
+
+/** "Callao, Peru" - the route, when the subject names a destination.
+ *
+ *  The pattern is CITY_COUNTRY, both halves wholly upper case, sitting inside
+ *  a subject whose other fields are delimited by " _ " or " - ". Either half
+ *  can carry a space (JEBEL ALI, SOUTH KOREA), so both are matched as a small
+ *  number of words rather than one run: an unbounded [A-Z ]+ would swallow the
+ *  company name that usually follows.
+ *
+ *  Nothing may sit between the city and the underscore, which is what keeps
+ *  "TO CONFIRM DOCS _ ..." from matching - there the underscore is spaced.
+ */
 function routeOf(subject) {
-  const m = String(subject || "").match(/([A-Z][A-Za-z ]+)_([A-Z][A-Za-z]+)/);
+  const m = String(subject || "")
+    .match(/\b([A-Z]+(?: [A-Z]+){0,2})_([A-Z]+(?: [A-Z]+)?)\b/);
   if (!m) return "";
-  const city = m[1].trim().replace(/\w/g, (c) => c.toUpperCase());
-  const country = m[2].replace(/\w/g, (c) => c.toUpperCase());
-  return `${city}, ${country}`;
+  return `${titleCase(m[1].trim())}, ${countryCase(m[2].trim())}`;
 }
 
 function seqNumber(emailId) {
