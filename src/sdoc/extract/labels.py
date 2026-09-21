@@ -21,7 +21,8 @@ _VARIANTS: dict[str, list[str]] = {
         "Notify", "Notify Party", "Notify Party/Intermediate Consignee",
     ],
     "port_of_loading": [
-        "Port of Loading", "POL", "Load Port", "Port of Loading (POL)",
+        "Port of Loading", "POL", "Load Port", "Loading Port",
+        "Port of Loading (POL)",
     ],
     "port_of_discharge": [
         "Port of Discharge", "POD", "Discharge Port", "Port of Discharge (POD)",

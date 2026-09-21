@@ -1,4 +1,4 @@
-from sdoc.extract.engine import extract_text_fields, snippet_for
+from sdoc.extract.engine import extract_all_fields, extract_text_fields, snippet_for
 from sdoc.models import DocText
 
 TXT_SI = DocText(path="a_SI.txt", fmt="txt", lines="""SHIPPING INSTRUCTION
@@ -108,3 +108,37 @@ def test_block_value_stops_at_a_non_field_label():
     got = extract_text_fields(PDF_COLLAPSED)
     assert got["port_of_discharge"] == "FREMANTLE, AUSTRALIA"
     assert "SOLID 16" not in got["port_of_discharge"]
+
+
+def test_pdf_colon_labels_take_values_from_the_next_unindented_line():
+    """PyMuPDF emits this shape for visually side-by-side label/value rows."""
+    doc = DocText(path="si.pdf", fmt="pdf", lines="""SHIPPING INSTRUCTION
+Shipping Line:
+Evergreen Marine
+Shipper:
+VITAL SOLUTIONS SDN BHD, KUALA LUMPUR, MALAYSIA
+Consignee:
+GLOBAL PAPER TRADING LLC, DUBAI, UNITED ARAB EMIRATES
+Notify Party:
+SAME AS CONSIGNEE
+Loading Port:
+PORT KLANG, MALAYSIA (MYPKG)
+Port of Discharge:
+JAKARTA, INDONESIA (IDJKT)
+Total Containers:
+2 x 40'HC
+Gross Weight (KG):
+42,000 KG""".splitlines())
+
+    got = extract_all_fields(doc)
+
+    assert got == {
+        "shipper": "VITAL SOLUTIONS SDN BHD, KUALA LUMPUR, MALAYSIA",
+        "consignee": "GLOBAL PAPER TRADING LLC, DUBAI, UNITED ARAB EMIRATES",
+        "notify_party": "SAME AS CONSIGNEE",
+        "port_of_loading": "PORT KLANG, MALAYSIA (MYPKG)",
+        "port_of_discharge": "JAKARTA, INDONESIA (IDJKT)",
+        "container_count": 2,
+        "gross_weight_kg": 42000,
+        "_conflict": False,
+    }

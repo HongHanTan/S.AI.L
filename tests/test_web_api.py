@@ -114,6 +114,24 @@ def test_stats_summarise_the_run(client):
     assert body["total"] == 3
 
 
+def test_stats_publish_the_averis_benchmark_separately(client):
+    """Held-out quality scores must not be confused with live run counts."""
+    c, _ = client
+    benchmark = c.get("/api/stats").json()["benchmark"]
+    assert benchmark == {
+        "dataset": "Averis Monash Hackathon Dataset",
+        "overall_score": 0.9734,
+        "end_to_end_defect_rate": 0.978,
+        "defects_caught": 45,
+        "defects_total": 46,
+        "stage3_defect_f1": 0.989,
+        "defect_precision": 1.0,
+        "classification_macro_f1": 0.955,
+        "reliability": 0.947,
+        "escalation_precision": 1.0,
+    }
+
+
 def test_stats_band_the_similarity_scores(client):
     """The dashboard reads this instead of fetching every record's verdicts."""
     c, _ = client

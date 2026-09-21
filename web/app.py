@@ -44,6 +44,23 @@ from sdoc.results import load_run
 # is validated before it is ever joined onto a filesystem path.
 _EMAIL_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
+# Fixed results from the final held-out Averis Monash Hackathon evaluation.
+# These are deliberately separate from the live run aggregates returned below:
+# operational counts can change with run.json, while benchmark scores must only
+# change after a new scored evaluation.
+AVERIS_BENCHMARK = {
+    "dataset": "Averis Monash Hackathon Dataset",
+    "overall_score": 0.9734,
+    "end_to_end_defect_rate": 0.978,
+    "defects_caught": 45,
+    "defects_total": 46,
+    "stage3_defect_f1": 0.989,
+    "defect_precision": 1.0,
+    "classification_macro_f1": 0.955,
+    "reliability": 0.947,
+    "escalation_precision": 1.0,
+}
+
 
 def _resolve_inbox(explicit: str | None) -> Path | None:
     """Where the organiser bundle's email records live, if they are here at all.
@@ -287,6 +304,7 @@ def create_app(run_path: str = "run.json", store: AliasStore | None = None,
             "emails_compared": compared,
             "fields_checked": sum(verdicts.values()),
             "fields": list(FIELDS),
+            "benchmark": dict(AVERIS_BENCHMARK),
             # yikkai's band summary, kept alongside the histogram buckets: it
             # names where the L3 thresholds actually sit, which the raw
             # buckets do not.

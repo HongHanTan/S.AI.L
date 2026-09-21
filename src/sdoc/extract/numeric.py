@@ -13,7 +13,7 @@ Measured against the bundle: counts are always "N x TYPE"; weights are
 """
 import re
 
-from sdoc.extract.labels import field_for_label
+from sdoc.extract.linear import extract_linear
 from sdoc.models import DocText
 
 _LEADING_INT = re.compile(r"^\s*(\d{1,4})\b")
@@ -40,17 +40,13 @@ def parse_weight_kg(value: str) -> int | None:
 
 
 def _from_summary(doc: DocText) -> tuple[int | None, int | None]:
-    count = weight = None
-    for line in doc.lines:
-        if ":" not in line:
-            continue
-        label, _, value = line.partition(":")
-        name = field_for_label(label)
-        if name == "container_count" and count is None:
-            count = parse_container_count(value.strip())
-        elif name == "gross_weight_kg" and weight is None:
-            weight = parse_weight_kg(value.strip())
-    return count, weight
+    # Use the same labelled-value reader as text fields so PDF labels whose
+    # values land on the following line work like inline summary labels.
+    fields = extract_linear(doc)
+    return (
+        parse_container_count(fields.get("container_count", "")),
+        parse_weight_kg(fields.get("gross_weight_kg", "")),
+    )
 
 
 def _from_table(doc: DocText) -> tuple[int | None, int | None]:

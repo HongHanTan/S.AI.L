@@ -210,6 +210,39 @@ async function renderOverview() {
   const mismatch = s.comparison_statuses.MISMATCH || 0;
   const review = s.comparison_statuses.NEEDS_REVIEW || 0;
   const ok = s.comparison_statuses.OK || 0;
+  const benchmark = s.benchmark || {};
+
+  const benchmarkMetrics = [
+    ["Overall score", `${((benchmark.overall_score || 0) * 100).toFixed(2)}%`,
+      "weighted final benchmark"],
+    ["Defect detection", `${((benchmark.end_to_end_defect_rate || 0) * 100).toFixed(1)}%`,
+      `${benchmark.defects_caught || 0} of ${benchmark.defects_total || 0} caught`],
+    ["Defect F1", `${((benchmark.stage3_defect_f1 || 0) * 100).toFixed(1)}%`,
+      `${((benchmark.defect_precision || 0) * 100).toFixed(0)}% precision`],
+    ["Classification F1", `${((benchmark.classification_macro_f1 || 0) * 100).toFixed(1)}%`,
+      "macro average across 5 classes"],
+    ["Reliability", `${((benchmark.reliability || 0) * 100).toFixed(1)}%`,
+      `${((benchmark.escalation_precision || 0) * 100).toFixed(0)}% escalation precision`],
+  ];
+
+  const benchmarkStrip = `
+    <section class="benchmark" aria-labelledby="benchmark-title">
+      <div class="benchmark-head">
+        <div>
+          <h3 id="benchmark-title">${esc(benchmark.dataset || "Averis Monash Hackathon Dataset")}:</h3>
+          <p>Held-out evaluation · accuracy, reliability and safety metrics</p>
+        </div>
+        <span class="benchmark-tag">Verified benchmark</span>
+      </div>
+      <div class="benchmark-metrics">
+        ${benchmarkMetrics.map(([label, value, detail]) => `
+          <div class="benchmark-metric">
+            <span>${esc(label)}</span>
+            <b class="num">${esc(value)}</b>
+            <small>${esc(detail)}</small>
+          </div>`).join("")}
+      </div>
+    </section>`;
 
   const tiles = `
     <div class="tiles">
@@ -267,6 +300,7 @@ async function renderOverview() {
           <svg class="ico" viewBox="0 0 24 24"><use href="#i-chevron"></use></svg></a>
       </div>
       ${tiles}
+      ${benchmarkStrip}
     </div>
 
     <div class="grid grid-3" style="margin-top:18px">

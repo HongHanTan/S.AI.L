@@ -77,12 +77,13 @@
 > are parsed and compared exactly. That is what makes every result auditable."
 
 ### Review queue — 3:00–3:30
-> "When the system cannot decide, it escalates instead of guessing. 18 cases are
-> here with their reason — a wrong document type, a missing attachment, an
-> unreadable scan. A reviewer confirms or corrects, and that decision is recorded
-> as a learned alias for future runs."
+**Return to Inbox and search for `email_509`.**
 
-**Click a decision button and show the confirmation.**
+> "When the system cannot decide, it escalates instead of guessing. Email 509
+> contains only the Shipping Instruction, and the sender explicitly says the
+> draft Bill of Lading is still missing. The system stops with NEEDS_REVIEW and
+> reason `missing_attachment` instead of inventing a comparison. The review queue
+> keeps this operational exception visible until a person obtains the document."
 
 ---
 
@@ -144,8 +145,8 @@
 | **Total** | **4m 55s** |
 
 Only five seconds of headroom now. If you run long, cut the second MISMATCH
-click at 2:30 — `email_004` alone carries the point — and trim the review queue
-beat to a single sentence.
+click at 2:30 — `email_004` alone carries the point — and keep the `email_509`
+review beat to a single sentence.
 
 ---
 
