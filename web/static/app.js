@@ -367,16 +367,23 @@ function queueRows() {
    unrelated questions into one row and duplicated what the board already shows
    far better. Board mode answers it now, and this one filter drives both
    modes, so narrowing to Mismatch and switching view keeps the narrowing. */
-function filterBar() {
+/* Two presentations of one control. The board has room above five lanes for a
+   segmented group with lit status markers; the list view puts the same control
+   in a narrow column beside the detail pane, where the markers and the longer
+   wording push it onto a second row. Same keys, same handler, same state. */
+function filterBar(mode) {
   const s = state.stats || { comparison_statuses: {} };
+  const board = mode === "board";
   const options = [
-    ["ALL", "All", state.emails.length],
-    ["MISMATCH", "Mismatch", s.comparison_statuses.MISMATCH || 0],
-    ["NEEDS_REVIEW", "Needs review", s.comparison_statuses.NEEDS_REVIEW || 0],
-    ["OK", "Clean", s.comparison_statuses.OK || 0],
+    ["ALL", "All", state.emails.length, ""],
+    ["MISMATCH", board ? "Mismatch found" : "Mismatch", s.comparison_statuses.MISMATCH || 0, "bad"],
+    ["NEEDS_REVIEW", "Needs review", s.comparison_statuses.NEEDS_REVIEW || 0, "warn"],
+    ["OK", board ? "Cleared" : "Clean", s.comparison_statuses.OK || 0, "ok"],
   ];
-  return `<div class="filters">${options.map(([key, label, count]) => `
+  return `<div class="filters${board ? " segmented" : ""}">${options
+    .map(([key, label, count, tone]) => `
     <button class="filter" data-filter="${key}" aria-pressed="${state.filter === key}">
+      ${board && tone ? `<i class="fdot ${tone}" aria-hidden="true"></i>` : ""}
       ${esc(label)}<em class="num">${count}</em></button>`).join("")}</div>`;
 }
 
@@ -427,7 +434,7 @@ async function renderInbox() {
 
   const controls = `
     <div class="queue-controls">
-      <div style="flex:1;min-width:0">${filterBar()}</div>
+      <div style="flex:1;min-width:0">${filterBar(state.mode)}</div>
       ${modeToggle()}
     </div>`;
 
@@ -476,6 +483,11 @@ async function renderInbox() {
       if (next) { next.focus(); location.hash = `#/inbox/${next.dataset.id}`; }
     });
   });
+
+  // Arriving from the board can land on a row far down a 520-row queue, so the
+  // selection is brought into view rather than left for the reader to hunt.
+  const current = queue.querySelector('.queue-row[aria-current="true"]');
+  if (current) current.scrollIntoView({ block: "nearest" });
 
   if (state.selected) await renderDetail();
 }
@@ -821,24 +833,75 @@ async function renderReview() {
 
 /* ---------------------------------------------------------------- try view */
 
+/* An <input type=file> hands back a read-only FileList, so there is no way to
+   drop one entry from it. The picked files are kept here instead and the
+   upload is built from this array; the input is only ever a source of new
+   files, and is emptied after every pick. */
+let tryFiles = [];
+
+/* Each inspected document, keyed by filename, so a row can show what the
+   document turned out to be and open its extracted text. */
 const tryPreviews = new Map();
 
-/* Files chosen so far. A file input replaces its whole selection each time the
-   picker closes, so picking the SI and then the BL would silently drop the SI.
-   We keep our own list and add to it instead. */
-const tryFiles = [];
+/* Deleting a file starts a fresh inspection while the previous one may still
+   be in flight. Only the newest run is allowed to write its answer back. */
+let inspectRun = 0;
 
-function addTryFiles(picked) {
-  for (const file of picked) {
-    const already = tryFiles.some(
-      (f) => f.name === file.name && f.size === file.size);
-    if (!already) tryFiles.push(file);
-  }
+const CONTEXT_FIELDS = ["cmp-carrier", "cmp-origin", "cmp-destination",
+                        "cmp-shipper", "cmp-consignee"];
+const CONTEXT_HINT = "Carrier, route and parties will be extracted from the attachments.";
+
+/** Bytes, at the precision a person reading a file list actually wants. */
+function fileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function removeTryFile(name) {
-  const i = tryFiles.findIndex((f) => f.name === name);
-  if (i >= 0) tryFiles.splice(i, 1);
+/** What the result pane says before anything has been run, and what Clear
+ *  form puts back. Written once so the two cannot drift apart. */
+const TRY_PLACEHOLDER = () => emptyState("i-play", "No result yet",
+  "Fill in the form and press Process email. The result appears here.");
+
+/** Clear form is live only when there is something to clear, so the control
+ *  reports the state of the form before anyone presses it. The context fields
+ *  are readonly and only ever filled from the attachments, so tryFiles already
+ *  speaks for them. */
+function syncClear() {
+  const typed = ["cmp-from", "cmp-subject", "cmp-body"].some((id) => el(id).value !== "");
+  const ran = !el("cmp-out").querySelector(".empty");
+  el("cmp-clear").disabled = !(typed || tryFiles.length > 0 || ran);
+}
+
+/** One row per attachment: what it is, how big, its text, and a way to drop it.
+ *  The type and Preview arrive later than the row itself, because they come
+ *  from /api/inspect - until then the button is present but dead, which says
+ *  "reading" more honestly than an absent control would. */
+function renderTryFiles() {
+  el("cmp-filelist").innerHTML = tryFiles.map((file, i) => {
+    const doc = tryPreviews.get(file.name);
+    const kind = doc ? (doc.detected_type || doc.format || "").toUpperCase() : "";
+    return `
+    <li class="file-row">
+      <svg class="ico faint" viewBox="0 0 24 24"><use href="#i-files"></use></svg>
+      <span class="file-name">${esc(file.name)}</span>
+      ${kind ? `<span class="file-kind mono">${esc(kind)}</span>` : ""}
+      <span class="file-size mono num">${fileSize(file.size)}</span>
+      <button class="btn btn-ghost btn-sm file-prev" type="button"
+              data-file="${esc(file.name)}" ${doc ? "" : "disabled"}
+              title="${doc ? "Show the text read from this attachment"
+                           : "Still reading this attachment"}">Preview</button>
+      <button class="file-del" type="button" data-i="${i}"
+              title="Remove ${esc(file.name)}" aria-label="Remove ${esc(file.name)}">
+        <svg class="ico" viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
+      </button>
+    </li>`;
+  }).join("");
+
+  el("cmp-count").textContent = tryFiles.length
+    ? `${tryFiles.length} file${tryFiles.length === 1 ? "" : "s"} attached`
+    : "";
+  syncClear();
 }
 
 function renderTry() {
@@ -894,22 +957,29 @@ function renderTry() {
           Carrier, route and parties will be extracted from the attachments.</p>
         <div class="field-group">
           <label for="cmp-files">Attachments &mdash; optional, any order</label>
-          <input type="file" id="cmp-files" multiple>
-          <div class="upload-list" id="cmp-file-list"></div>
+          <input type="file" id="cmp-files" class="file-input" multiple>
+          <div class="file-pick">
+            <button class="btn btn-ghost btn-sm" type="button" id="cmp-pick">
+              <svg class="ico" viewBox="0 0 24 24"><use href="#i-files"></use></svg>
+              Choose files</button>
+            <span class="muted file-count" id="cmp-count" aria-live="polite"></span>
+          </div>
+          <ul class="filelist" id="cmp-filelist"></ul>
         </div>
 
         <div class="btn-row">
           <button class="btn" id="cmp-run"><svg class="ico" viewBox="0 0 24 24"><use href="#i-play"></use></svg> Process email</button>
           <button class="btn btn-ghost btn-sm" id="cmp-eg1">Load a document check</button>
           <button class="btn btn-ghost btn-sm" id="cmp-eg2">Load a spam example</button>
+          <button class="btn btn-ghost btn-sm btn-danger btn-reset" type="button"
+                  id="cmp-clear" disabled>
+            <svg class="ico" viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
+            Clear form</button>
         </div>
         <p class="muted" id="cmp-msg" style="font-size:12px;margin:10px 0 0"></p>
       </div>
 
-      <div class="card" id="cmp-out">
-        ${emptyState("i-play", "No result yet",
-          "Fill in the form and press Process email. The result appears here.")}
-      </div>
+      <div class="card" id="cmp-out">${TRY_PLACEHOLDER()}</div>
     </div>
     <dialog class="attachment-dialog" id="attachment-preview">
       <div class="attachment-dialog-head"><div><h2 id="preview-name">Attachment</h2>
@@ -919,12 +989,63 @@ function renderTry() {
     </dialog>`;
 
   el("cmp-run").addEventListener("click", runCompare);
-  el("cmp-files").addEventListener("change", (event) => {
-    const picked = [...event.target.files];
-    event.target.value = "";     // so the same file can be chosen again
-    inspectTryAttachments(picked);
-  });
+  el("cmp-pick").addEventListener("click", () => el("cmp-files").click());
   el("preview-close").addEventListener("click", () => el("attachment-preview").close());
+
+  el("cmp-files").addEventListener("change", () => {
+    const input = el("cmp-files");
+    for (const file of input.files) {
+      // The same name at the same size twice over is a double-pick, not two
+      // documents, so it is dropped rather than uploaded twice.
+      if (!tryFiles.some((f) => f.name === file.name && f.size === file.size)) {
+        tryFiles.push(file);
+      }
+    }
+    input.value = "";   // so picking the same file again still fires change
+    renderTryFiles();
+    inspectTryAttachments();
+  });
+
+  el("cmp-clear").addEventListener("click", () => {
+    for (const id of ["cmp-from", "cmp-subject", "cmp-body"]) el(id).value = "";
+    for (const id of CONTEXT_FIELDS) el(id).value = "";
+    tryFiles = [];
+    tryPreviews.clear();
+    inspectRun += 1;          // abandon any inspection still in flight
+    el("cmp-files").value = "";
+    renderTryFiles();
+    el("cmp-msg").textContent = "";
+    el("cmp-context-msg").textContent = CONTEXT_HINT;
+    el("cmp-out").innerHTML = TRY_PLACEHOLDER();
+    if (el("attachment-preview").open) el("attachment-preview").close();
+    syncClear();
+    el("cmp-from").focus();
+  });
+
+  for (const id of ["cmp-from", "cmp-subject", "cmp-body"]) {
+    el(id).addEventListener("input", syncClear);
+  }
+
+  el("cmp-filelist").addEventListener("click", (event) => {
+    const preview = event.target.closest(".file-prev");
+    if (preview) { openAttachmentPreview(preview.dataset.file); return; }
+
+    const button = event.target.closest(".file-del");
+    if (!button) return;
+    const index = Number(button.dataset.i);
+    tryFiles.splice(index, 1);
+    renderTryFiles();
+    // Carrier, route and parties were read from the whole set, so dropping one
+    // document makes them stale. They are derived again from what is left.
+    inspectTryAttachments();
+    // That button no longer exists, so focus is handed to the row that moved
+    // into its place, or back to the picker once the list is empty.
+    const rest = el("cmp-filelist").querySelectorAll(".file-del");
+    (rest[Math.min(index, rest.length - 1)] || el("cmp-pick")).focus();
+  });
+
+  renderTryFiles();
+  syncClear();
 
   el("cmp-eg1").addEventListener("click", () => {
     el("cmp-from").value = "docs@vitalsolutions.sg";
@@ -936,6 +1057,7 @@ function renderTry() {
       "Best Regards,", "Deswita",
     ].join("\n");
     el("cmp-msg").textContent = "Now attach an SI and a BL, then press Process email.";
+    syncClear();
   });
 
   el("cmp-eg2").addEventListener("click", () => {
@@ -943,57 +1065,36 @@ function renderTry() {
     el("cmp-subject").value = "Increase your shipping revenue with this ONE weird trick";
     el("cmp-body").value = "Click here now to unlock unlimited freight discounts!";
     el("cmp-msg").textContent = "No attachments needed — just press Process email.";
+    syncClear();
   });
 }
 
-/** Draw the chosen files. Independent of inspection: if /api/inspect fails we
- *  still have to show what the user picked, or a failed request is
- *  indistinguishable from a file that never got added. */
-function renderTryFileList() {
-  const host = el("cmp-file-list");
-  if (!host) return;
-  host.innerHTML = tryFiles.map((file) => {
-    const doc = tryPreviews.get(file.name);
-    return `<div class="upload-row"><span class="mono">${esc(file.name)}</span>
-      <span class="muted">${doc ? esc((doc.detected_type || doc.format || "file").toUpperCase()) : ""}</span>
-      <button class="btn btn-ghost btn-sm preview-file" data-file="${esc(file.name)}"
-        ${doc ? "" : "disabled"}>Preview</button>
-      <button class="btn btn-ghost btn-sm remove-file" data-file="${esc(file.name)}"
-        aria-label="Remove ${esc(file.name)}">&times;</button></div>`;
-  }).join("");
-  host.querySelectorAll(".remove-file").forEach((button) =>
-    button.addEventListener("click", () => {
-      removeTryFile(button.dataset.file);
-      renderTryFileList();
-      inspectTryAttachments();
-    }));
-  host.querySelectorAll(".preview-file").forEach((button) =>
-    button.addEventListener("click", () => openAttachmentPreview(button.dataset.file)));
-}
-
-async function inspectTryAttachments(picked) {
-  if (picked) addTryFiles(picked);
-  const files = tryFiles;
+/** Reads the attachments through /api/inspect so the shipment context panel can
+ *  be filled and each document's text can be previewed.
+ *
+ *  It works from tryFiles, not the input's own FileList: once a row has been
+ *  deleted the input still holds the original pick, so inspecting that would
+ *  describe documents that are no longer attached.
+ */
+async function inspectTryAttachments() {
+  const run = ++inspectRun;
+  const files = [...tryFiles];
   const message = el("cmp-context-msg");
   tryPreviews.clear();
-  el("cmp-carrier").value = "";
-  el("cmp-origin").value = "";
-  el("cmp-destination").value = "";
-  el("cmp-shipper").value = "";
-  el("cmp-consignee").value = "";
+  for (const id of CONTEXT_FIELDS) el(id).value = "";
   if (!files.length) {
-    message.textContent = "Carrier, route and parties will be extracted from the attachments.";
-    el("cmp-file-list").innerHTML = "";
+    message.textContent = CONTEXT_HINT;
+    renderTryFiles();
     return;
   }
-  renderTryFileList();
-  message.textContent =
-    `${files.length} file${files.length === 1 ? "" : "s"} selected. Reading and detecting shipment context...`;
+
+  message.textContent = "Reading attachments and detecting shipment context…";
   const form = new FormData();
   for (const file of files) form.append("files", file);
   try {
     const response = await fetch("/api/inspect", { method: "POST", body: form });
     const data = await response.json();
+    if (run !== inspectRun) return;   // the attachments changed under this run
     if (!response.ok) throw new Error(data.detail || "Attachment inspection failed.");
     const context = data.shipment_context || {};
     const detected = data.detected_fields || {};
@@ -1004,16 +1105,17 @@ async function inspectTryAttachments(picked) {
     el("cmp-consignee").value = detected.consignee || "";
     for (const doc of data.documents || []) tryPreviews.set(doc.filename, doc);
     const route = context.origin_country && context.destination_country
-      ? `${context.origin_country} â†’ ${context.destination_country}` : "";
-    const found = [context.carrier, route].filter(Boolean).join(" Â· ");
+      ? `${context.origin_country} → ${context.destination_country}` : "";
+    const found = [context.carrier, route].filter(Boolean).join(" · ");
     message.textContent = found ? `Detected from attachments: ${found}`
       : "No carrier or route could be confidently extracted.";
-    renderTryFileList();
   } catch (error) {
-    renderTryFileList();
-    message.textContent =
-      `${files.length} file${files.length === 1 ? "" : "s"} selected. ${error.message}`;
+    if (run !== inspectRun) return;
+    message.textContent = error.message;
   }
+  // Either way the rows are redrawn: on success they gain their type and a live
+  // Preview button; on failure they stay as plain removable rows.
+  renderTryFiles();
 }
 
 function openAttachmentPreview(filename) {
@@ -1022,7 +1124,7 @@ function openAttachmentPreview(filename) {
   el("preview-name").textContent = filename;
   el("preview-meta").textContent = [doc.format && doc.format.toUpperCase(),
     doc.detected_type || "UNKNOWN", doc.preview_truncated ? "preview truncated" : ""]
-    .filter(Boolean).join(" Â· ");
+    .filter(Boolean).join(" · ");
   el("preview-text").textContent = doc.preview || doc.error || "No extractable text found.";
   el("attachment-preview").showModal();
 }
@@ -1064,6 +1166,7 @@ async function runCompare() {
   } finally {
     button.disabled = false;
     message.textContent = "";
+    syncClear();
   }
 }
 
@@ -1195,6 +1298,29 @@ function wireQueueControls(target) {
    src/sdoc/models.py, which is what submission.json is scored on, shown
    verbatim so a lane maps onto an evaluation key with no translation step. */
 
+/* Inlined rather than added to the sprite: the sprite lives in index.html and
+   this change is confined to the script and the stylesheet. Each is a filled
+   24x24 path in the same idiom as the sprite's own icons, and each takes its
+   colour from the lane's --cat, so the icon, the header rule and the count
+   badge are all one hue with no second place to keep it in step. */
+const LANE_ICONS = {
+  // Stacked sheets: one document checked against another.
+  BL_COMPARISON: "M12 2 2 7l10 5 10-5-10-5Zm7.8 7.3L12 13.2 4.2 9.3 2 10.4l10 5 "
+    + "10-5-2.2-1.1Zm0 4.5L12 17.7l-7.8-3.9L2 14.9l10 5 10-5-2.2-1.1Z",
+  // Into the tray: an instruction arriving or being asked for.
+  SI_REQUEST: "M11 3h2v6.2l2.3-2.3 1.4 1.4L12 13l-4.7-4.7 1.4-1.4L11 9.2V3Zm-7 11h5.2"
+    + "l1.2 2h3.2l1.2-2H20v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5Z",
+  // A receipt, torn edge and all.
+  INVOICE_QUERY: "M5 2h14v20l-2.3-1.5-2.3 1.5-2.4-1.5-2.3 1.5L7.3 20.5 5 22V2Zm2 4v2h10V6"
+    + "H7Zm0 4v2h10v-2H7Zm0 4v2h7v-2H7Z",
+  // Plain correspondence.
+  GENERAL: "M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm1 3.2V17"
+    + "h16V8.2l-8 5-8-5ZM19.4 7H4.6l7.4 4.6L19.4 7Z",
+  // Shield with a warning: caught, not delivered.
+  SPAM: "M12 2 4 5.5V11c0 4.6 3.4 8.6 8 9.8 4.6-1.2 8-5.2 8-9.8V5.5L12 2Zm-1 4.5h2v6h-2v-6Z"
+    + "m0 7.8h2v2h-2v-2Z",
+};
+
 const CATEGORY_LANES = [
   ["BL_COMPARISON",  "Draft checked against instruction"],
   ["SI_REQUEST",     "Shipping instruction sent or requested"],
@@ -1211,17 +1337,60 @@ const FIELD_LABEL = {
 
 /** "5RSG-00133" style booking reference, if the subject carries one. */
 function bookingRef(subject) {
-  const m = String(subject || "").match(/\d[A-Z]{3}-\d{5}/);
+  const m = String(subject || "").match(/\b\d[A-Z]{3}-\d{5}\b/);
   return m ? m[0] : "";
 }
 
-/** "Callao, Peru" - the route, when the subject names a destination. */
+/** Title case from the shouted upper case the subjects arrive in. */
+const titleWord = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+const titleCase = (text) => text.split(" ").map(titleWord).join(" ");
+
+/** As above, but a short all-caps run in a country is a code rather than a
+ *  word: US and UAE are names in their own right and "Us" reads as the
+ *  pronoun. The rule is confined to the country half, because in a city the
+ *  same run is an ordinary name - Jebel ALI and NEW York, otherwise.
+ */
+const countryCase = (text) => text.split(" ")
+  .map((w) => (/^[A-Z]{2,3}$/.test(w) ? w : titleWord(w))).join(" ");
+
+/** "Callao, Peru" - the route, when the subject names a destination.
+ *
+ *  The pattern is CITY_COUNTRY, both halves wholly upper case, sitting inside
+ *  a subject whose other fields are delimited by " _ " or " - ". Either half
+ *  can carry a space (JEBEL ALI, SOUTH KOREA), so both are matched as a small
+ *  number of words rather than one run: an unbounded [A-Z ]+ would swallow the
+ *  company name that usually follows.
+ *
+ *  Nothing may sit between the city and the underscore, which is what keeps
+ *  "TO CONFIRM DOCS _ ..." from matching - there the underscore is spaced.
+ */
 function routeOf(subject) {
-  const m = String(subject || "").match(/([A-Z][A-Za-z ]+)_([A-Z][A-Za-z]+)/);
+  const m = String(subject || "")
+    .match(/\b([A-Z]+(?: [A-Z]+){0,2})_([A-Z]+(?: [A-Z]+)?)\b/);
   if (!m) return "";
-  const city = m[1].trim().replace(/\w/g, (c) => c.toUpperCase());
-  const country = m[2].replace(/\w/g, (c) => c.toUpperCase());
-  return `${city}, ${country}`;
+  return `${titleCase(m[1].trim())}, ${countryCase(m[2].trim())}`;
+}
+
+/** A subject field that is only the raw CITY_COUNTRY token. */
+const ROUTE_TOKEN = /^[A-Z]+(?: [A-Z]+){0,2}_[A-Z]+(?: [A-Z]+)?$/;
+
+/** The subject broken into its delimited fields, with the reply marker, the
+ *  booking reference and the raw port token dropped: all three have their own
+ *  place on the card now, and repeating them is what made the line unreadable.
+ *
+ *  Subjects separate fields with " _ " or " - ", so the split is on the spaced
+ *  delimiter, and on a trailing "_ " where the leading space was dropped. A
+ *  bare underscore is never one: it is what holds CALLAO_PERU together, and
+ *  what dates like 15_01_2026 are built from.
+ */
+function subjectParts(subject, ref) {
+  return String(subject || "")
+    .replace(/^\s*(?:re|fw|fwd)\s*[:_-]\s*/i, "")
+    .split(/\s+[_-]\s+|_\s+|_{2,}/)
+    .map((part) => part.replace(/^[\s_]+|[\s_]+$/g, ""))
+    .filter(Boolean)
+    .filter((part) => !(ref && part.includes(ref)))
+    .filter((part) => !ROUTE_TOKEN.test(part));
 }
 
 function seqNumber(emailId) {
@@ -1242,6 +1411,11 @@ function boardOutcome(rec) {
   return { cls: "ok", text: "All 7 fields match" };
 }
 
+/* Inlined rather than added to the sprite, because the sprite lives in
+   index.html and this change is confined to the script and the stylesheet. */
+const CLIP_PATH = "M7 8v8.5a5 5 0 0 0 10 0V6.5a3.5 3.5 0 1 0-7 0V16a2 2 0 1 0 "
+  + "4 0V8h-1.5v8a.5.5 0 0 1-1 0V6.5a2 2 0 1 1 4 0V16.5a3.5 3.5 0 1 1-7 0V8H7Z";
+
 /** One card. On the board a card opens a dialog rather than navigating: the
  *  lanes are a survey, and losing your place in them to read one verdict is a
  *  poor trade. */
@@ -1251,19 +1425,28 @@ function boardCard(rec) {
   const outcome = boardOutcome(rec);
   const count = rec.attachment_count;
 
+  // With a reference the top slot is that reference and the whole remaining
+  // subject reads below it. Without one - 194 of the 520, and the payload
+  // carries no sender to put there instead - the subject's own first field is
+  // promoted into the slot and the rest reads below, so the header is never
+  // empty and nothing is said twice.
+  const parts = subjectParts(rec.subject, ref);
+  const head = ref || parts[0] || "";
+  const body = (ref ? parts : parts.slice(1)).join(" \u00b7 ");
+
   return `<button type="button" class="bcard" data-open="${esc(rec.email_id)}"
              data-status="${esc(rec.status)}">
     <span class="bcard-top">
-      <span class="bcard-ref mono">${esc(ref || "—")}</span>
+      ${head ? `<span class="bcard-ref${ref ? " mono" : " text"}">${esc(head)}</span>` : ""}
       <span class="bcard-seq mono">#${esc(seqNumber(rec.email_id))}</span>
     </span>
     ${route ? `<span class="bcard-route">&rarr; ${esc(route)}</span>` : ""}
-    <span class="bcard-subject">${esc(rec.subject || "(no subject)")}</span>
+    ${body ? `<span class="bcard-subject">${esc(body)}</span>` : ""}
     ${outcome.text
       ? `<span class="bcard-outcome ${outcome.cls}">${esc(outcome.text)}</span>`
-      : `<span class="bcard-att">${count
-            ? `${count} attachment${count === 1 ? "" : "s"}`
-            : "No attachments"}</span>`}
+      : ""}
+    ${count ? `<span class="bcard-att"><svg class="clip" viewBox="0 0 24 24"
+         aria-hidden="true"><path d="${CLIP_PATH}"/></svg>${count}</span>` : ""}
   </button>`;
 }
 
@@ -1280,6 +1463,8 @@ function boardLanes(rows) {
       <header class="lane-h">
         <h2>
           <span class="lane-name">
+            <svg class="lane-i" viewBox="0 0 24 24" aria-hidden="true"
+              ><path d="${LANE_ICONS[key]}"/></svg>
             <span class="enum mono">${esc(key)}</span>
             ${key === "BL_COMPARISON" ? `<span class="lane-flag">primary desk</span>` : ""}
           </span>
@@ -1349,8 +1534,9 @@ async function openBoardDialog(emailId) {
     ${banner}
     ${verdictTable(d) || `<p class="note">No field comparison ran on this email.</p>`}
     <p class="dlg-foot">
-      <a class="act" href="#/inbox/${encodeURIComponent(d.email_id)}">Open in the queue</a>
-      <span class="faint">for the full decision trace</span>
+      <a class="act queue-link" href="#/inbox/${encodeURIComponent(d.email_id)}"
+         >Open in the queue <span aria-hidden="true">&rarr;</span></a>
+      <span class="dlg-note">for the full decision trace</span>
     </p>`;
 
   el("card-dialog-close").addEventListener("click", () => dlg.close());
