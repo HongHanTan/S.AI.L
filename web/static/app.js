@@ -235,7 +235,13 @@ async function renderOverview() {
         <span class="benchmark-tag">Verified benchmark</span>
       </div>
       <div class="benchmark-metrics">
-        ${benchmarkMetrics.map(([label, value, detail]) => `
+        ${benchmarkMetrics.map(([label, value, detail]) => label === "Defect detection" ? `
+          <button type="button" class="benchmark-metric benchmark-metric-action"
+              id="defect-detection-card" aria-haspopup="dialog" aria-controls="defect-dialog">
+            <span>${esc(label)} <i aria-hidden="true">View missed case &rarr;</i></span>
+            <b class="num">${esc(value)}</b>
+            <small>${esc(detail)}</small>
+          </button>` : `
           <div class="benchmark-metric">
             <span>${esc(label)}</span>
             <b class="num">${esc(value)}</b>
@@ -373,6 +379,111 @@ async function renderOverview() {
           <a href="#/review" style="color:var(--accent);font-weight:600">Review queue</a>.</p>
       </div>
     </div>`;
+
+  el("defect-detection-card")?.addEventListener("click", openDefectDialog);
+}
+
+/** Explain the sole false negative as a visual failure chain. The benchmark
+ *  endpoint exposes aggregate counts only, so the source lines are explicitly
+ *  presented as a reconstruction based on email_407's saved extraction trace. */
+function openDefectDialog() {
+  const dlg = el("defect-dialog");
+  const host = el("defect-dialog-body");
+  wireDefectDialogDismissal();
+
+  host.innerHTML = `
+    <header class="failure-head">
+      <div>
+        <div class="failure-kicker"><span>Missed defect</span>
+          <code>email_407</code> <em>Failure reconstruction</em></div>
+        <h2 id="defect-dialog-title">Why the 46th defect was missed</h2>
+        <p>Shipment <code>5RUS-74951</code> &middot; Shipping Instruction PDF vs draft Bill of Lading PDF</p>
+      </div>
+      <button class="icon-btn" id="defect-dialog-close" aria-label="Close">&times;</button>
+    </header>
+
+    <div class="failure-result">
+      <span class="failure-result-icon"><svg class="ico" viewBox="0 0 24 24"><use href="#i-alert"></use></svg></span>
+      <div><b>The system returned <code>OK</code>, but the notify-party details contained a defect.</b>
+        <p>Both incomplete extractions looked identical, so the comparison confidently returned <code>SAME</code>.</p></div>
+    </div>
+
+    <div class="failure-flow" aria-label="How the defect was missed">
+      <section class="failure-step source-step">
+        <div class="step-label"><b>1</b><span>Unusual PDF layout</span></div>
+        <div class="paper-mock">
+          <div class="paper-top"><span>DRAFT BILL OF LADING</span><small>Page 1</small></div>
+          <div class="pdf-field">
+            <span class="pdf-label">NOTIFY PARTY</span>
+            <strong>NAGAPPA EXPORTS</strong>
+          </div>
+          <div class="orphan-line">
+            <span class="orphan-tag">unlabelled continuation</span>
+            <strong>NEW NO: <mark>32</mark>, L-BLOCK, 17TH STREET</strong>
+            <span>ANNA NAGAR EAST, CHENNAI 600102</span>
+          </div>
+        </div>
+        <p>The address continued in a separate, unlabelled text block. The changed street number sat outside the field boundary.</p>
+      </section>
+
+      <span class="flow-arrow" aria-hidden="true">&rarr;</span>
+
+      <section class="failure-step capture-step">
+        <div class="step-label"><b>2</b><span>Incomplete extraction</span></div>
+        <div class="capture-box">
+          <span>SI captured</span><strong>NAGAPPA EXPORTS</strong>
+          <span>BL captured</span><strong>NAGAPPA EXPORTS</strong>
+        </div>
+        <div class="missing-callout"><span>&times;</span><p><b>Continuation lost</b><br>The address line was never passed to comparison.</p></div>
+      </section>
+
+      <span class="flow-arrow" aria-hidden="true">&rarr;</span>
+
+      <section class="failure-step decision-step">
+        <div class="step-label"><b>3</b><span>Incorrect decision</span></div>
+        <div class="false-ok"><span>System result</span><strong>OK</strong>
+          <code>NAGAPPA EXPORTS = NAGAPPA EXPORTS</code></div>
+        <div class="actual-result"><span>Actual result</span><strong>DEFECT</strong>
+          <small>Notify-party address differs</small></div>
+      </section>
+    </div>
+
+    <section class="future-fix">
+      <div class="future-fix-title"><span>Next upgrade</span><h3>Layout-aware OCR closes this gap</h3></div>
+      <div class="future-fix-items">
+        <div><b>01</b><span><strong>Follow field geometry</strong><small>Join nearby continuation blocks by position.</small></span></div>
+        <div><b>02</b><span><strong>Measure confidence</strong><small>Escalate incomplete or low-confidence fields.</small></span></div>
+        <div><b>03</b><span><strong>Highlight the source</strong><small>Show exactly which PDF region produced each value.</small></span></div>
+      </div>
+    </section>
+
+    <footer class="failure-foot">
+      <p><strong>Evidence note:</strong> the benchmark reports aggregate results only. This view reconstructs the failure mode from the saved <code>email_407</code> extraction trace.</p>
+      <div>
+        <button type="button" class="btn btn-ghost btn-sm" id="defect-dialog-done">Close</button>
+        <a class="btn btn-primary btn-sm" id="defect-open-email" href="#/inbox/email_407/evidence">Open email_407</a>
+      </div>
+    </footer>`;
+
+  dlg.showModal();
+  el("defect-dialog-close").addEventListener("click", () => dlg.close());
+  el("defect-dialog-done").addEventListener("click", () => dlg.close());
+  el("defect-open-email").addEventListener("click", () => {
+    state.mode = "list";
+    dlg.close();
+  });
+}
+
+function wireDefectDialogDismissal() {
+  const dlg = el("defect-dialog");
+  if (!dlg || dlg.dataset.wired) return;
+  dlg.dataset.wired = "1";
+  dlg.addEventListener("click", (event) => {
+    const box = dlg.getBoundingClientRect();
+    const outside = event.clientX < box.left || event.clientX > box.right ||
+      event.clientY < box.top || event.clientY > box.bottom;
+    if (outside) dlg.close();
+  });
 }
 
 /* ------------------------------------------------------------------ inbox */

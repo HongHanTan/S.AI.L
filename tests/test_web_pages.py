@@ -45,3 +45,13 @@ def test_static_assets_are_revalidated(client):
 def test_static_assets_are_served(client):
     assert client.get("/static/app.js").status_code == 200
     assert client.get("/static/style.css").status_code == 200
+
+
+def test_defect_metric_opens_missed_case_reconstruction(client):
+    html = client.get("/").text
+    script = client.get("/static/app.js").text
+    assert 'id="defect-dialog"' in html
+    assert 'id="defect-detection-card"' in script
+    assert "email_407" in script
+    assert "unlabelled continuation" in script
+    assert "Layout-aware OCR" in script
