@@ -1,5 +1,5 @@
 # S.AI.L - more than just verifying
-<img width="2103" height="748" alt="ChatGPT Image Sep 21, 2026, 04_41_09 PM" src="https://github.com/user-attachments/assets/e3853fce-c7ed-4fd3-ad84-d4ec7bde25f5" />
+<img width="2103" height="748" alt="ChatGPT Image Sep 21, 2026, 09_53_07 PM" src="https://github.com/user-attachments/assets/a64d01b1-d45f-4014-8acf-f0fbdea940a7" />
 
 > One step further, from document consistency to destination-aware
 
