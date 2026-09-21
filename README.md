@@ -5,6 +5,8 @@
 
 [Live demo](https://sibl-seven.vercel.app) | [Architecture notes](docs/architecture.md) | [Score history](docs/scores.md) | [Country-rule fixtures](demo-country-rules/)
 
+**Jump to:** [Technical Architecture](#4-technical-architecture) | [Implementation Details](#5-implementation-details) | [Challenges Faced](#6-challenges-faced) | [Future Roadmap](#9-future-roadmap-technical-and-business-growth)
+
 ---
 
 ## 1. Understanding the shipping ecosystem and workflow
