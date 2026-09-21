@@ -827,6 +827,18 @@ async function renderReview() {
    files, and is emptied after every pick. */
 let tryFiles = [];
 
+/* Each inspected document, keyed by filename, so a row can show what the
+   document turned out to be and open its extracted text. */
+const tryPreviews = new Map();
+
+/* Deleting a file starts a fresh inspection while the previous one may still
+   be in flight. Only the newest run is allowed to write its answer back. */
+let inspectRun = 0;
+
+const CONTEXT_FIELDS = ["cmp-carrier", "cmp-origin", "cmp-destination",
+                        "cmp-shipper", "cmp-consignee"];
+const CONTEXT_HINT = "Carrier, route and parties will be extracted from the attachments.";
+
 /** Bytes, at the precision a person reading a file list actually wants. */
 function fileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -840,24 +852,39 @@ const TRY_PLACEHOLDER = () => emptyState("i-play", "No result yet",
   "Fill in the form and press Process email. The result appears here.");
 
 /** Clear form is live only when there is something to clear, so the control
- *  reports the state of the form before anyone presses it. */
+ *  reports the state of the form before anyone presses it. The context fields
+ *  are readonly and only ever filled from the attachments, so tryFiles already
+ *  speaks for them. */
 function syncClear() {
   const typed = ["cmp-from", "cmp-subject", "cmp-body"].some((id) => el(id).value !== "");
   const ran = !el("cmp-out").querySelector(".empty");
   el("cmp-clear").disabled = !(typed || tryFiles.length > 0 || ran);
 }
 
+/** One row per attachment: what it is, how big, its text, and a way to drop it.
+ *  The type and Preview arrive later than the row itself, because they come
+ *  from /api/inspect - until then the button is present but dead, which says
+ *  "reading" more honestly than an absent control would. */
 function renderTryFiles() {
-  el("cmp-filelist").innerHTML = tryFiles.map((file, i) => `
+  el("cmp-filelist").innerHTML = tryFiles.map((file, i) => {
+    const doc = tryPreviews.get(file.name);
+    const kind = doc ? (doc.detected_type || doc.format || "").toUpperCase() : "";
+    return `
     <li class="file-row">
       <svg class="ico faint" viewBox="0 0 24 24"><use href="#i-files"></use></svg>
       <span class="file-name">${esc(file.name)}</span>
+      ${kind ? `<span class="file-kind mono">${esc(kind)}</span>` : ""}
       <span class="file-size mono num">${fileSize(file.size)}</span>
+      <button class="btn btn-ghost btn-sm file-prev" type="button"
+              data-file="${esc(file.name)}" ${doc ? "" : "disabled"}
+              title="${doc ? "Show the text read from this attachment"
+                           : "Still reading this attachment"}">Preview</button>
       <button class="file-del" type="button" data-i="${i}"
               title="Remove ${esc(file.name)}" aria-label="Remove ${esc(file.name)}">
         <svg class="ico" viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
       </button>
-    </li>`).join("");
+    </li>`;
+  }).join("");
 
   el("cmp-count").textContent = tryFiles.length
     ? `${tryFiles.length} file${tryFiles.length === 1 ? "" : "s"} attached`
@@ -898,6 +925,24 @@ function renderTry() {
           <textarea class="textarea" id="cmp-body"
             placeholder="Hi,&#10;&#10;Attached are the SI and draft BL. Please check the details and confirm.&#10;&#10;Thanks"></textarea>
         </div>
+        <div class="context-grid">
+          <div class="field-group"><label for="cmp-carrier">Carrier</label>
+            <input class="input auto-input" id="cmp-carrier" readonly placeholder="Auto-detected"></div>
+          <div class="field-group"><label for="cmp-origin">Origin country</label>
+            <input class="input auto-input mono" id="cmp-origin" readonly placeholder="Auto"></div>
+          <div class="field-group"><label for="cmp-destination">Destination country</label>
+            <input class="input auto-input mono" id="cmp-destination" readonly placeholder="Auto"></div>
+        </div>
+        <div class="party-grid">
+          <div class="field-group"><label for="cmp-shipper">Shipper</label>
+            <textarea class="textarea auto-input party-input" id="cmp-shipper" readonly
+              placeholder="Auto-detected from SI"></textarea></div>
+          <div class="field-group"><label for="cmp-consignee">Consignee</label>
+            <textarea class="textarea auto-input party-input" id="cmp-consignee" readonly
+              placeholder="Auto-detected from SI"></textarea></div>
+        </div>
+        <p class="muted" id="cmp-context-msg" style="font-size:12px;margin:7px 0 0">
+          Carrier, route and parties will be extracted from the attachments.</p>
         <div class="field-group">
           <label for="cmp-files">Attachments &mdash; optional, any order</label>
           <input type="file" id="cmp-files" class="file-input" multiple>
@@ -923,10 +968,17 @@ function renderTry() {
       </div>
 
       <div class="card" id="cmp-out">${TRY_PLACEHOLDER()}</div>
-    </div>`;
+    </div>
+    <dialog class="attachment-dialog" id="attachment-preview">
+      <div class="attachment-dialog-head"><div><h2 id="preview-name">Attachment</h2>
+        <p class="muted" id="preview-meta"></p></div>
+        <button class="btn btn-ghost btn-sm" id="preview-close">Close</button></div>
+      <pre id="preview-text"></pre>
+    </dialog>`;
 
   el("cmp-run").addEventListener("click", runCompare);
   el("cmp-pick").addEventListener("click", () => el("cmp-files").click());
+  el("preview-close").addEventListener("click", () => el("attachment-preview").close());
 
   el("cmp-files").addEventListener("change", () => {
     const input = el("cmp-files");
@@ -939,15 +991,21 @@ function renderTry() {
     }
     input.value = "";   // so picking the same file again still fires change
     renderTryFiles();
+    inspectTryAttachments();
   });
 
   el("cmp-clear").addEventListener("click", () => {
     for (const id of ["cmp-from", "cmp-subject", "cmp-body"]) el(id).value = "";
+    for (const id of CONTEXT_FIELDS) el(id).value = "";
     tryFiles = [];
+    tryPreviews.clear();
+    inspectRun += 1;          // abandon any inspection still in flight
     el("cmp-files").value = "";
     renderTryFiles();
     el("cmp-msg").textContent = "";
+    el("cmp-context-msg").textContent = CONTEXT_HINT;
     el("cmp-out").innerHTML = TRY_PLACEHOLDER();
+    if (el("attachment-preview").open) el("attachment-preview").close();
     syncClear();
     el("cmp-from").focus();
   });
@@ -957,11 +1015,17 @@ function renderTry() {
   }
 
   el("cmp-filelist").addEventListener("click", (event) => {
+    const preview = event.target.closest(".file-prev");
+    if (preview) { openAttachmentPreview(preview.dataset.file); return; }
+
     const button = event.target.closest(".file-del");
     if (!button) return;
     const index = Number(button.dataset.i);
     tryFiles.splice(index, 1);
     renderTryFiles();
+    // Carrier, route and parties were read from the whole set, so dropping one
+    // document makes them stale. They are derived again from what is left.
+    inspectTryAttachments();
     // That button no longer exists, so focus is handed to the row that moved
     // into its place, or back to the picker once the list is empty.
     const rest = el("cmp-filelist").querySelectorAll(".file-del");
@@ -991,6 +1055,66 @@ function renderTry() {
     el("cmp-msg").textContent = "No attachments needed — just press Process email.";
     syncClear();
   });
+}
+
+/** Reads the attachments through /api/inspect so the shipment context panel can
+ *  be filled and each document's text can be previewed.
+ *
+ *  It works from tryFiles, not the input's own FileList: once a row has been
+ *  deleted the input still holds the original pick, so inspecting that would
+ *  describe documents that are no longer attached.
+ */
+async function inspectTryAttachments() {
+  const run = ++inspectRun;
+  const files = [...tryFiles];
+  const message = el("cmp-context-msg");
+  tryPreviews.clear();
+  for (const id of CONTEXT_FIELDS) el(id).value = "";
+  if (!files.length) {
+    message.textContent = CONTEXT_HINT;
+    renderTryFiles();
+    return;
+  }
+
+  message.textContent = "Reading attachments and detecting shipment context…";
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  try {
+    const response = await fetch("/api/inspect", { method: "POST", body: form });
+    const data = await response.json();
+    if (run !== inspectRun) return;   // the attachments changed under this run
+    if (!response.ok) throw new Error(data.detail || "Attachment inspection failed.");
+    const context = data.shipment_context || {};
+    const detected = data.detected_fields || {};
+    el("cmp-carrier").value = context.carrier || "";
+    el("cmp-origin").value = context.origin_country || "";
+    el("cmp-destination").value = context.destination_country || "";
+    el("cmp-shipper").value = detected.shipper || "";
+    el("cmp-consignee").value = detected.consignee || "";
+    for (const doc of data.documents || []) tryPreviews.set(doc.filename, doc);
+    const route = context.origin_country && context.destination_country
+      ? `${context.origin_country} → ${context.destination_country}` : "";
+    const found = [context.carrier, route].filter(Boolean).join(" · ");
+    message.textContent = found ? `Detected from attachments: ${found}`
+      : "No carrier or route could be confidently extracted.";
+  } catch (error) {
+    if (run !== inspectRun) return;
+    message.textContent = error.message;
+  }
+  // Either way the rows are redrawn: on success they gain their type and a live
+  // Preview button; on failure they stay as plain removable rows.
+  renderTryFiles();
+}
+
+function openAttachmentPreview(filename) {
+  const doc = tryPreviews.get(filename);
+  if (!doc) return;
+  el("preview-name").textContent = filename;
+  el("preview-meta").textContent = [doc.format && doc.format.toUpperCase(),
+    doc.detected_type || "UNKNOWN", doc.preview_truncated ? "preview truncated" : ""]
+    .filter(Boolean).join(" · ");
+  el("preview-text").textContent = doc.preview || doc.error || "No extractable text found.";
+  el("attachment-preview").showModal();
 }
 
 async function runCompare() {
@@ -1042,6 +1166,17 @@ function compareResult(d) {
       <span>${esc(roleName[doc.detected_type] || "not a shipping document")}</span></li>`).join("");
 
   const isComparison = d.category === "BL_COMPARISON";
+  const context = d.shipment_context || {};
+  const findings = d.compliance_findings || [];
+  const compliance = d.compliance_status || "NOT_CHECKED";
+  const complianceClass = compliance === "PASS" ? "OK"
+    : compliance === "BLOCK" ? "MISMATCH" : "info";
+  const complianceRows = findings.map((finding) => `
+    <div class="compliance-row ${finding.status === "PASS" ? "pass" : "block"}">
+      <div><strong>${esc(finding.status)}</strong> &middot; ${esc(FIELD_LABEL[finding.field] || finding.field)}</div>
+      <p>${esc(finding.message)}</p><p class="muted">${esc(finding.action)}</p>
+      <a href="${esc(finding.source_url)}" target="_blank" rel="noopener">Published requirement</a>
+    </div>`).join("");
   let banner;
   if (!isComparison && d.category) {
     banner = `<div class="banner info"><svg class="ico" viewBox="0 0 24 24"><use href="#i-mail"></use></svg>
@@ -1071,6 +1206,16 @@ function compareResult(d) {
     ${roles ? `<span class="eyebrow" style="display:block;margin-top:18px">Documents read as</span>
       <ul class="roles">${roles}</ul>` : ""}
     ${(d.notes || []).length ? `<div class="notes">${d.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}</div>` : ""}
+    ${isComparison ? `<div class="country-panel">
+      <span class="eyebrow">Country compliance</span>
+      <div class="banner ${complianceClass}" style="margin-top:8px">
+        <span><strong>${esc(compliance)}</strong>${context.carrier ? ` &middot; ${esc(context.carrier)}` : ""}
+        ${context.origin_country && context.destination_country
+          ? ` &middot; ${esc(context.origin_country)} &rarr; ${esc(context.destination_country)}` : ""}</span></div>
+      ${complianceRows || `<p class="note">${compliance === "NOT_APPLICABLE"
+        ? "No configured country rule applies to this route."
+        : "The carrier or route could not be extracted from the attachments."}</p>`}
+    </div>` : ""}
     ${verdictTable(d)}
     ${ladder(d)}`;
 }

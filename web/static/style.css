@@ -327,6 +327,10 @@ mark {
 
 .field-group { margin-top:16px; }
 .field-group label { display:block; font-size:12px; font-weight:600; margin-bottom:6px; }
+.context-grid { display:grid; grid-template-columns:1.35fr .8fr .8fr; gap:10px; }
+.party-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.auto-input[readonly] { color:var(--ink); background:var(--canvas); cursor:default; }
+.party-input { min-height:72px; font-family:var(--mono); font-size:11px; }
 .input, .textarea {
   width:100%; padding:11px 14px; border:1px solid var(--line-2);
   border-radius:var(--r-md); background:var(--canvas); font-size:13px;
@@ -352,17 +356,31 @@ mark {
   list-style:none; margin:10px 0 0; padding:0;
   display:grid; grid-template-columns:minmax(0,1fr); gap:6px;
 }
+/* The row carries six things now - icon, name, type, size, Preview, bin - and
+   the card it sits in is only ~38% of the viewport. Below about 320px of row
+   there is no arrangement that fits them on one line, so it wraps rather than
+   squeezing the name to nothing and pushing the bin out through the edge. */
 .file-row {
-  display:flex; align-items:center; gap:10px; min-width:0; max-width:100%;
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+  min-width:0; max-width:100%;
   padding:8px 8px 8px 12px; border:1px solid var(--line-2);
   border-radius:var(--r-md); background:var(--canvas);
 }
 .file-row .ico { font-size:15px; }
+/* A basis rather than 0: the name asks for 130px, so when the line is too
+   tight the controls wrap away instead of the name vanishing. */
 .file-name {
-  flex:1; min-width:0; font-size:13px;
+  flex:1 1 130px; min-width:0; font-size:13px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .file-size { flex:0 0 auto; font-size:11px; color:var(--muted); white-space:nowrap; }
+/* What /api/inspect decided the document is. Absent until the answer lands. */
+.file-kind {
+  flex:0 0 auto; font-size:10px; font-weight:600; letter-spacing:.04em;
+  color:var(--muted); background:var(--line); padding:2px 7px;
+  border-radius:var(--r-pill);
+}
+.file-prev { flex:0 0 auto; height:28px; padding:0 11px; font-size:11px; }
 
 /* --faint would be 1.74:1 here, under the 3:1 a control has to clear, so the
    bin rests at --muted and turns red only under the pointer. */
@@ -374,6 +392,36 @@ mark {
 }
 .file-del:hover { background:var(--bad-soft); color:var(--bad); }
 .file-del:focus-visible { color:var(--bad); }
+
+.attachment-dialog { width:min(840px,calc(100vw - 32px)); padding:0;
+  color:var(--ink); background:var(--card); border:1px solid var(--line);
+  border-radius:10px; box-shadow:0 20px 70px rgba(27,29,42,.28); }
+.attachment-dialog::backdrop { background:rgba(27,29,42,.45); backdrop-filter:blur(2px); }
+.attachment-dialog-head { display:flex; align-items:flex-start; justify-content:space-between;
+  gap:16px; padding:16px 18px; border-bottom:1px solid var(--line); }
+.attachment-dialog-head h2 { margin:0 0 4px; font-size:16px; }
+.attachment-dialog-head p { margin:0; }
+.attachment-dialog pre { margin:0; padding:18px; max-height:70vh; overflow:auto;
+  white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.6 var(--mono); }
+.country-panel { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+/* var(--radius) is not a token in this stylesheet, so it resolved to nothing
+   and left these square in a rounded system. --r-md is the card-scale radius. */
+.compliance-row { margin-top:8px; padding:11px 12px; border:1px solid var(--line);
+  border-left-width:3px; border-radius:var(--r-md); background:var(--canvas); font-size:12px; }
+.compliance-row.pass { border-left-color:var(--ok); }
+.compliance-row.block { border-left-color:var(--bad); }
+.compliance-row.block strong { color:var(--bad); }
+.compliance-row.pass strong { color:var(--ok); }
+.compliance-row p { margin:5px 0 0; }
+.compliance-row a { display:inline-block; margin-top:7px; color:var(--accent); }
+
+@media (max-width:560px) {
+  .context-grid { grid-template-columns:1fr; }
+  .party-grid { grid-template-columns:1fr; }
+  /* The row keeps the name, the size and both controls; the type badge is the
+     one thing a narrow screen can lose without losing a capability. */
+  .file-kind { display:none; }
+}
 
 .btn {
   border:0; cursor:pointer; height:44px; padding:0 22px; border-radius:var(--r-pill);

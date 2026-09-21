@@ -5,6 +5,11 @@
     python scripts/run.py http://localhost:8080   # build and score
 """
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
 
 from sdoc.classify import classify_all, make_classifier
 from sdoc.compare.adjudicate import make_adjudicator

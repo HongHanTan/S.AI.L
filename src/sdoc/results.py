@@ -25,6 +25,9 @@ def save_run(results, emails_by_id: dict, path: str = "run.json") -> None:
             "attachment_names": [str(a).rsplit("/", 1)[-1] for a in attachments],
             "verdicts": [asdict(v) for v in r.verdicts],
             "notes": r.notes,
+            "shipment_context": r.shipment_context,
+            "compliance_status": r.compliance_status,
+            "compliance_findings": r.compliance_findings,
         }
     Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 

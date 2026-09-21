@@ -1,0 +1,13 @@
+SHIPPING INSTRUCTION
+========================================
+Shipping Line: Evergreen Marine
+
+Shipper: VITAL SOLUTIONS SDN BHD
+  KUALA LUMPUR, MALAYSIA
+Consignee: GLOBAL PAPER TRADING LLC
+  DUBAI, UNITED ARAB EMIRATES
+Notify Party: SAME AS CONSIGNEE
+Port of Loading: PORT KLANG, MALAYSIA (MYPKG)
+Port of Discharge: JAKARTA, INDONESIA (IDJKT)
+Total Containers: 2 x 40'HC
+Gross Weight (KG): 42,000 KG
